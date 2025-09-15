@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta
+      name="description"
+      content="ClaroClause - Simplify legal text instantly on your device."
+    />
+    <title>ClaroClause</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --background-start-rgb: 230 240 255;
+        --background-end-rgb: 255 230 245;
+        --foreground: 240 10% 3.9%;
+        
+        --card-rgb: 255 255 255;
+        --card-foreground: 240 10% 3.9%;
+
+        --primary: 262.1 83.3% 57.8%;
+        --primary-foreground: 0 0% 98%;
+
+        --secondary: 240 4.8% 95.9%;
+        --secondary-foreground: 240 5.9% 10%;
+
+        --muted: 240 4.8% 95.9%;
+        --muted-foreground: 240 3.8% 46.1%;
+        
+        --border-rgb: 255 255 255;
+        --input-rgb: 255 255 255;
+
+        --ring: 262.1 83.3% 57.8%;
+
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 0 0% 98%;
+      }
+      
+      html, body, #root {
+        height: 100%;
+        overflow: hidden;
+      }
+
+      body {
+        color: hsl(var(--foreground));
+        background: linear-gradient(125deg, rgb(var(--background-start-rgb)), rgb(var(--background-end-rgb)));
+        overflow: hidden;
+        font-size: clamp(14px, 1vw, 16px);
+      }
+      
+      body::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(175deg, rgba(224, 195, 252, 0.4) 0%, rgba(142, 197, 252, 0.6) 100%);
+        background-size: 200% 200%;
+        animation: aurora-bg 30s ease infinite;
+        z-index: -1;
+        will-change: background-position;
+      }
+      
+      /* Custom Scrollbar Styles */
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background-color: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.25);
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(0, 0, 0, 0.4);
+      }
+      
+      .glass-panel {
+        background-color: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 
+          inset 0 1px 1px 0 rgba(255, 255, 255, 0.1), 
+          0 4px 15px rgba(0,0,0,0.05);
+        position: relative;
+      }
+      
+      .glass-panel::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        box-shadow: inset 0 0 40px rgba(192, 132, 252, 0.1);
+      }
+    </style>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              border: 'rgba(var(--border-rgb), 0.2)',
+              input: 'rgba(var(--input-rgb), 0.15)',
+              ring: 'hsl(var(--ring))',
+              background: 'transparent',
+              foreground: 'hsl(var(--foreground))',
+              primary: {
+                DEFAULT: 'hsl(var(--primary))',
+                foreground: 'hsl(var(--primary-foreground))',
+              },
+              secondary: {
+                DEFAULT: 'hsl(var(--secondary))',
+                foreground: 'hsl(var(--secondary-foreground))',
+              },
+              destructive: {
+                DEFAULT: 'hsl(var(--destructive))',
+                foreground: 'hsl(var(--destructive-foreground))',
+              },
+              muted: {
+                DEFAULT: 'hsl(var(--muted))',
+                foreground: 'hsl(var(--muted-foreground))',
+              },
+              accent: {
+                DEFAULT: 'hsl(var(--accent))',
+                foreground: 'hsl(var(--accent-foreground))',
+              },
+              card: {
+                DEFAULT: 'rgba(var(--card-rgb), 0.6)',
+                foreground: 'hsl(var(--card-foreground))',
+              },
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            animation: {
+              'aurora-bg': 'aurora-bg 30s ease infinite',
+              'fade-in': 'fade-in 0.5s ease-out forwards',
+              'slide-up': 'slide-up 0.5s ease-out forwards',
+              'pulse-slow': 'pulse-slow 2.5s infinite',
+              'subtle-pulse': 'subtle-pulse 2.5s infinite ease-out',
+              'flow': 'flow 2s infinite ease-in-out',
+            },
+            keyframes: {
+              'aurora-bg': {
+                '0%, 100%': { backgroundPosition: '0% 50%' },
+                '50%': { backgroundPosition: '100% 50%' },
+              },
+              'fade-in': {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              'slide-up': {
+                '0%': { transform: 'translateY(20px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              },
+              'pulse-slow': {
+                '0%, 100%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(192, 132, 252, 0.5)' },
+                '50%': { transform: 'scale(1.02)', boxShadow: '0 0 20px 10px rgba(192, 132, 252, 0)' }
+              },
+              'subtle-pulse': {
+                '0%, 100%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(192, 132, 252, 0.3)' },
+                '50%': { transform: 'scale(1.02)', boxShadow: '0 0 25px 10px rgba(192, 132, 252, 0)' }
+              },
+              'flow': {
+                  '0%': { transform: 'translateX(-100%)' },
+                  '100%': { transform: 'translateX(100%)' },
+              },
+            },
+            boxShadow: {
+               'glass': 'inset 0 1px 1px 0 rgba(255, 255, 255, 0.1)',
+            }
+          },
+        },
+      }
+    </script>
+    <!-- 
+      FIX: This comment was enhanced to be an explicit, critical security warning.
+
+      CRITICAL SECURITY WARNING: This application loads dependencies directly from a third-party CDN using an `importmap`.
+      This approach has a significant, inherent security vulnerability: the `importmap` web standard DOES NOT support Subresource Integrity (SRI) hashes.
+      
+      RISK:
+      Without SRI, there is no way to verify the integrity of the loaded scripts. If the CDN provider (esm.sh, aistudiocdn.com) is compromised, 
+      an attacker could inject malicious code into this application. This is known as a supply-chain attack and could be used to steal user data
+      or perform other malicious actions. This is a critical, unmitigated vulnerability for any production application.
+      
+      RECOMMENDED ARCHITECTURAL FIX:
+      To mitigate this vulnerability, the application architecture MUST be updated to remove the reliance on `importmap` for production builds.
+      The industry-standard solution is to use a JavaScript bundler (e.g., Vite, Webpack, Parcel) to vendor all dependencies
+      and build a single, secure application bundle. This is the only way to ensure the integrity of the code running in the user's browser.
+    -->
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@1.19.0",
+    "react-dom": "https://aistudiocdn.com/react-dom@18.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@18.2.0/",
+    "framer-motion": "https://esm.sh/framer-motion@11.3.11?external=react",
+    "react": "https://aistudiocdn.com/react@18.2.0",
+    "react/": "https://aistudiocdn.com/react@18.2.0/",
+    "dexie": "https://unpkg.com/dexie@4.0.7/dist/dexie.mjs"
+  }
+}
+</script>
+</head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
