@@ -64,8 +64,8 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, transition: { duration: 0.2 } }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
-      whileHover={{ y: -4, boxShadow: '0px 8px 40px -8px rgba(var(--primary-rgb), 0.2)' }}
+      transition={{ layout: { duration: 0.4, type: "spring" }, opacity: { duration: 0.4, ease: 'easeOut' } }}
+      whileHover={{ y: -5, scale: 1.01, boxShadow: '0px 10px 40px -10px rgba(var(--primary-rgb), 0.3)' }}
     >
       <div
         className={`glass-panel border-l-4 ${riskStyle.borderColorClass} rounded-r-xl rounded-b-xl backdrop-blur-sm transition-shadow duration-300 ${highRiskGlow} overflow-hidden`}

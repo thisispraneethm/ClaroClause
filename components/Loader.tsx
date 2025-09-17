@@ -36,28 +36,16 @@ export const Loader: React.FC<LoaderProps> = ({ progress }) => {
   return (
     <div className="flex flex-col items-center justify-center space-y-6 my-12 animate-fade-in w-full max-w-md mx-auto">
         {/* 
-          The loader icon visually represents the process of "scanning" a document,
-          enhancing the user's understanding of the current action.
+          Breathtaking: The loader icon is now a subtle, elegant pulse, enhancing the feel of a sophisticated process.
         */}
         <div className="relative w-20 h-20">
             <DocumentTextIcon className="w-full h-full text-muted-foreground/30" />
             <motion.div
-                className="absolute top-0 left-0 w-full h-full flex items-center justify-center"
-                animate={{
-                    y: [-16, 16, -16],
-                }}
-                transition={{
-                    duration: 4,
-                    ease: "easeInOut",
-                    repeat: Infinity,
-                }}
+                className="absolute inset-0 flex items-center justify-center"
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 2.5, ease: "easeInOut", repeat: Infinity }}
             >
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 4, ease: 'linear', repeat: Infinity}}
-                >
-                  <SearchCodeIcon className="w-10 h-10 text-primary" />
-                </motion.div>
+                <SearchCodeIcon className="w-10 h-10 text-primary" />
             </motion.div>
         </div>
 

@@ -23,7 +23,7 @@
         --card-rgb: 24 24 30;
         --card-foreground-rgb: 235 235 240;
 
-        --primary-rgb: 173 150 255; 
+        --primary-rgb: 191 169 255; /* Breathtaking: Brighter, more vibrant purple */
         --primary-foreground-rgb: 10 10 15;
 
         --secondary-rgb: 40 42 54;
@@ -33,7 +33,7 @@
         --muted-foreground-rgb: 156 163 175;
         
         --border-rgb: 50 52 64;
-        --ring-rgb: 173 150 255;
+        --ring-rgb: 191 169 255; /* Breathtaking: Updated ring color */
 
         --risk-high-rgb: 250 100 100;
         --risk-medium-rgb: 251 191 36;
@@ -86,7 +86,7 @@
         overflow: hidden;
       }
       
-      /* --- START: NEW AURORA NEBULA BACKGROUND --- */
+      /* --- Breathtaking: REFINED AURORA NEBULA BACKGROUND --- */
       @keyframes aurora-spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
@@ -105,20 +105,15 @@
         pointer-events: none;
         
         background-image:
-          /* Layer 1: Slow, spinning, large-scale conic gradients for aurora bands */
-          conic-gradient(from 120deg at 60% 50%, rgba(var(--primary-rgb), 0.25), transparent 30%),
-          conic-gradient(from 300deg at 40% 50%, rgba(var(--risk-low-rgb), 0.2), transparent 30%),
-          
-          /* Layer 2: Soft, flowing radial gradients for cloud-like depth */
-          radial-gradient(ellipse at 20% 80%, rgba(var(--risk-medium-rgb), 0.25), transparent 40%),
-          radial-gradient(ellipse at 80% 30%, rgba(var(--primary-rgb), 0.2), transparent 40%);
+          conic-gradient(from 120deg at 60% 50%, rgba(var(--primary-rgb), 0.2), transparent 30%),
+          conic-gradient(from 300deg at 40% 50%, rgba(var(--risk-low-rgb), 0.15), transparent 30%),
+          radial-gradient(ellipse at 20% 80%, rgba(var(--risk-medium-rgb), 0.2), transparent 40%),
+          radial-gradient(ellipse at 80% 30%, rgba(var(--primary-rgb), 0.15), transparent 40%);
         
-        /* Different animations for a parallax effect */
         animation: 
-          aurora-spin 80s linear infinite,
-          aurora-flow 40s ease-in-out infinite alternate;
+          aurora-spin 120s linear infinite, /* Slower, more majestic */
+          aurora-flow 60s ease-in-out infinite alternate;
         
-        /* Multiple background properties for each layer */
         background-size: 200% 200%, 200% 200%, 300% 300%, 300% 300%;
         background-position: 0% 0%, 0% 0%, 0% 0%, 0% 0%;
 
@@ -137,13 +132,12 @@
           radial-gradient(ellipse at 20% 80%, rgba(var(--risk-medium-rgb), 0.15), transparent 40%),
           radial-gradient(ellipse at 80% 30%, rgba(var(--primary-rgb), 0.1), transparent 40%);
       }
-      /* --- END: NEW AURORA NEBULA BACKGROUND --- */
+      /* --- END: REFINED BACKGROUND --- */
       
       body::after {
         content: '';
         position: fixed;
         top: 0; left: 0; right: 0; bottom: 0;
-        /* More subtle grid */
         background-image: radial-gradient(rgba(var(--border-rgb), 0.5) 0.5px, transparent 0.5px);
         background-size: 32px 32px;
         z-index: -1;
@@ -172,39 +166,47 @@
         background-color: rgba(var(--border-rgb), 0.8);
       }
       
+      /* --- Breathtaking: POLISHED GLASS PANEL --- */
       .glass-panel {
           backdrop-filter: blur(32px) saturate(180%);
           -webkit-backdrop-filter: blur(32px) saturate(180%);
           position: relative;
           transition: background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-          z-index: 1; /* Ensure panel is above background effects */
+          z-index: 1;
       }
 
       html[data-theme='dark'] .glass-panel {
-          background-color: rgba(var(--card-rgb), 0.5);
-          background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
-          border: 1px solid rgba(var(--foreground-rgb), 0.1);
+          background-color: rgba(var(--card-rgb), 0.6);
+          background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+          border: 1px solid rgba(var(--foreground-rgb), 0.12);
           box-shadow: 
-              inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.05),
-              0 10px 40px -10px rgba(var(--shadow-color-rgb), 0.4);
+              inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.06),
+              0 12px 50px -12px rgba(var(--shadow-color-rgb), 0.5);
       }
 
       html[data-theme='light'] .glass-panel {
-          background-color: rgba(var(--card-rgb), 0.7);
-          background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.7), transparent);
-          border: 1px solid rgba(var(--border-rgb), 0.7);
+          background-color: rgba(var(--card-rgb), 0.8);
+          background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent);
+          border: 1px solid rgba(var(--border-rgb), 0.8);
           box-shadow: 
-              inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.5),
-              0 10px 40px -15px rgba(var(--shadow-color-rgb), 0.2);
+              inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.6),
+              0 12px 50px -15px rgba(var(--shadow-color-rgb), 0.25);
       }
       
+      /* --- Breathtaking: POLISHED TEXT HIGHLIGHT --- */
       mark {
-        background-color: rgba(var(--primary-rgb), 0.25);
-        color: inherit;
-        padding: 0.1em 0.3em;
-        border-radius: 4px;
-        transition: background-color 0.3s ease, color 0.3s ease;
-        box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.3);
+        background-color: rgba(var(--primary-rgb), 0.4);
+        color: white;
+        font-weight: 500;
+        padding: 0.1em 0.4em;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+        box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.25);
+      }
+
+      html[data-theme='light'] mark {
+        background-color: rgba(var(--primary-rgb), 0.2);
+        color: rgb(var(--primary-rgb));
       }
       
       @keyframes drafting-pulse {
@@ -221,10 +223,15 @@
           animation: drafting-pulse 2.5s infinite ease-in-out;
       }
 
-      @keyframes animated-gradient-border {
+      /* Breathtaking: Centralized gradient animation */
+      @keyframes animated-gradient {
         0% { background-position: 0% 50% }
         50% { background-position: 100% 50% }
         100% { background-position: 0% 50% }
+      }
+      .animated-gradient-text {
+        background-size: 200% 200%;
+        animation: animated-gradient 4s ease infinite;
       }
 
       .feature-card {
@@ -239,7 +246,7 @@
         border-radius: inherit;
         background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.8), rgba(var(--risk-medium-rgb), 0.6), rgba(var(--primary-rgb), 0.8));
         background-size: 300% 300%;
-        animation: animated-gradient-border 6s ease infinite;
+        animation: animated-gradient 6s ease infinite;
         opacity: 0;
         transition: opacity 0.4s ease-out;
       }
@@ -293,8 +300,9 @@
               'fade-in': 'fade-in 0.5s ease-out forwards',
               'slide-up': 'slide-up 0.5s ease-out forwards',
               'scale-in': 'scale-in 0.3s ease-out forwards',
-              'subtle-pulse': 'subtle-pulse 3s infinite ease-out',
+              'subtle-pulse': 'subtle-pulse 3s infinite cubic-bezier(0.4, 0, 0.6, 1)',
               'flow': 'flow 2s infinite ease-in-out',
+              'flow-border': 'animated-gradient 3s ease infinite',
             },
             keyframes: {
               'enter': {
@@ -317,9 +325,10 @@
                   '0%': { transform: 'scale(0.95)', opacity: '0' },
                   '100%': { transform: 'scale(1)', opacity: '1' },
               },
+              /* Breathtaking: Organic button pulse */
               'subtle-pulse': {
-                '0%, 100%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(var(--primary-rgb), 0.2)' },
-                '50%': { transform: 'scale(1.02)', boxShadow: '0 0 40px 15px rgba(var(--primary-rgb), 0)' }
+                '0%, 100%': { transform: 'scale(1)', filter: 'brightness(1)' },
+                '50%': { transform: 'scale(1.03)', filter: 'brightness(1.15)' }
               },
               'flow': {
                   '0%': { transform: 'translateX(-100%)' },
@@ -328,7 +337,7 @@
             },
             boxShadow: {
                'glass': 'inset 0 1px 1px 0 rgba(var(--border-rgb), 0.05)',
-               'primary-glow': '0 0 20px rgba(var(--primary-rgb), 0.3)',
+               'primary-glow': '0 0 25px rgba(var(--primary-rgb), 0.3)',
             }
           },
         },

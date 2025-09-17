@@ -64,7 +64,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartAnalysis }) => {
                 </span>
             </motion.div>
             <motion.h1 variants={itemVariants} className="text-5xl md:text-7xl font-bold tracking-tight text-card-foreground font-serif">
-                Understand the <br/> Fine Print, <span className="bg-clip-text text-transparent bg-gradient-to-br from-primary to-fuchsia-400">Instantly</span>
+                Understand the <br/> Fine Print, <span className="animated-gradient-text bg-clip-text text-transparent bg-gradient-to-br from-primary to-fuchsia-400">Instantly</span>
             </motion.h1>
             <motion.p variants={itemVariants} className="mt-6 text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
                 Paste any legal document, and our AI provides a simple, plain-English explanation. 100% private and secure.

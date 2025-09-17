@@ -218,30 +218,32 @@ export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, 
         <div ref={chatEndRef} />
       </div>
       <div className="mt-auto p-4">
-        <form onSubmit={handleSubmit} className="relative">
-         {isAiTyping && (
-             <div className="absolute -top-px -left-px -right-px -bottom-px bg-gradient-to-r from-transparent via-primary/50 to-transparent animate-flow pointer-events-none rounded-full" style={{ backgroundSize: '200% 200%' }}/>
-          )}
-          <div className="glass-panel rounded-full flex items-end p-2 pl-5">
-            <textarea
-                ref={textareaRef}
-                rows={1}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={isAiTyping ? "AI is responding..." : "Ask a question about the document..."}
-                className="flex-1 bg-transparent border-none text-base placeholder-muted-foreground focus:ring-0 disabled:opacity-50 resize-none max-h-40 overflow-y-auto"
-                disabled={isAiTyping}
-                aria-label="Chat input"
-            />
-            <button 
-                type="submit"
-                className="w-10 h-10 flex-shrink-0 bg-primary text-primary-foreground rounded-full flex items-center justify-center hover:bg-primary/90 transition-all duration-200 disabled:opacity-50 disabled:scale-90"
-                disabled={!input.trim() || isAiTyping}
-                aria-label="Send message"
-            >
-                <PaperAirplaneIcon className="w-5 h-5" />
-            </button>
+        <form onSubmit={handleSubmit}>
+          <div className="relative">
+            {isAiTyping && (
+                <div className="absolute -inset-0.5 rounded-full bg-[length:200%_200%] bg-gradient-to-r from-primary via-fuchsia-400 to-primary animate-flow-border pointer-events-none" />
+            )}
+            <div className="relative glass-panel rounded-full flex items-end p-2 pl-5">
+              <textarea
+                  ref={textareaRef}
+                  rows={1}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={isAiTyping ? "AI is responding..." : "Ask a question about the document..."}
+                  className="flex-1 bg-transparent border-none text-base placeholder-muted-foreground focus:ring-0 disabled:opacity-50 resize-none max-h-40 overflow-y-auto"
+                  disabled={isAiTyping}
+                  aria-label="Chat input"
+              />
+              <button 
+                  type="submit"
+                  className="w-10 h-10 flex-shrink-0 bg-primary text-primary-foreground rounded-full flex items-center justify-center hover:bg-primary/90 transition-all duration-200 disabled:opacity-50 disabled:scale-90"
+                  disabled={!input.trim() || isAiTyping}
+                  aria-label="Send message"
+              >
+                  <PaperAirplaneIcon className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </form>
       </div>
