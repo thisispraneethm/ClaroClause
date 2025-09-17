@@ -7,6 +7,7 @@ import { GitCompareArrowsIcon } from './icons/GitCompareArrowsIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { HomeIcon } from './icons/HomeIcon';
 import { HelpCircleIcon } from './icons/HelpCircleIcon';
+import { HistoryIcon } from './icons/HistoryIcon';
 import { motion } from 'framer-motion';
 
 interface SidebarProps {
@@ -17,10 +18,11 @@ interface SidebarProps {
 
 const Tooltip: React.FC<{ text: string; children: React.ReactElement; id: string }> = ({ text, children, id }) => {
     return (
-        // FIX: group-focus-within makes the tooltip accessible to keyboard users.
+        // The group-focus-within class makes the tooltip accessible to keyboard users.
         <div className="relative group flex items-center">
-            {/* FIX: The 'aria-describedby' prop must be passed as a string literal (kebab-case) to React.cloneElement. This is because TypeScript cannot correctly infer the props of the generic 'children' element, leading to a type error when using the standard camelCase version. */}
-            {React.cloneElement(children, { 'aria-describedby': id })}
+            {/* The 'aria-describedby' prop is passed to the child element to link it to the tooltip for accessibility. */}
+            {/* FIX: Changed 'aria-describedby' to ariaDescribedBy. React converts camelCase props to kebab-case for ARIA attributes. This resolves the TypeScript error which incorrectly fails to recognize the kebab-case version in this context. */}
+            {React.cloneElement(children, { ariaDescribedBy: id })}
             <div 
                 id={id}
                 role="tooltip"
@@ -39,7 +41,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTool, setActiveTool, isD
     { id: 'analyze', icon: ClipboardListIcon, label: 'Analyze Document', disabled: false },
     { id: 'chat', icon: MessageCircleIcon, label: 'Chat with Document', disabled: !isDocumentLoaded },
     { id: 'compare', icon: GitCompareArrowsIcon, label: 'Compare Documents', disabled: false },
-    { id: 'draft', icon: PencilIcon, label: 'Draft with AI', disabled: true },
+    { id: 'draft', icon: PencilIcon, label: 'Draft with AI', disabled: false },
+    { id: 'history', icon: HistoryIcon, label: 'Analysis History', disabled: false },
   ];
   
   const bottomNavItems = [

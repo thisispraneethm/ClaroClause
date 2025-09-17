@@ -3,6 +3,8 @@ import type { ContractAnalysis } from '../types';
 import { RiskLevel } from '../types';
 import { InfoIcon } from './icons/InfoIcon';
 import { motion, useSpring, useTransform } from 'framer-motion';
+import { CopyIcon } from './icons/CopyIcon';
+import { CheckCircleIcon } from './icons/CheckCircleIcon';
 
 interface SummaryHeaderProps {
   analysis: ContractAnalysis;
@@ -73,6 +75,23 @@ export const SummaryHeader: React.FC<SummaryHeaderProps> = ({ analysis }) => {
         }, {} as Record<RiskLevel, number>);
     }, [analysis.clauses]);
     
+    const [copyStatus, setCopyStatus] = React.useState<'Copy' | 'Copied!'>('Copy');
+
+    const handleCopySummary = () => {
+        const summaryText = `
+Document: ${analysis.documentTitle}
+Contract Score: ${analysis.overallScore}/100
+
+Key Takeaways:
+${analysis.keyTakeaways.map(t => `- ${t}`).join('\n')}
+    `.trim();
+
+        navigator.clipboard.writeText(summaryText).then(() => {
+            setCopyStatus('Copied!');
+            setTimeout(() => setCopyStatus('Copy'), 2000);
+        });
+    };
+
     const riskItems = [
         { level: RiskLevel.Low, color: 'bg-green-500', label: 'Low Risk' },
         { level: RiskLevel.Medium, color: 'bg-yellow-500', label: 'Medium Risk' },
@@ -99,7 +118,16 @@ export const SummaryHeader: React.FC<SummaryHeaderProps> = ({ analysis }) => {
                     </div>
                 </div>
                 <div className="md:col-span-2 md:pl-4">
-                    <h2 className="text-xl font-bold text-card-foreground mb-3">Key Takeaways</h2>
+                    <div className="flex justify-between items-start mb-3">
+                        <h2 className="text-xl font-bold text-card-foreground">Key Takeaways</h2>
+                        <button
+                            onClick={handleCopySummary}
+                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 text-xs rounded-md text-muted-foreground hover:bg-white/20 hover:text-foreground transition-all duration-200"
+                        >
+                            {copyStatus === 'Copied!' ? <CheckCircleIcon className="w-3.5 h-3.5 text-green-500" /> : <CopyIcon className="w-3.5 h-3.5" />}
+                            <span>{copyStatus} Summary</span>
+                        </button>
+                    </div>
                     <ul className="space-y-3">
                         {analysis.keyTakeaways.map((takeaway, index) => (
                             <motion.li 

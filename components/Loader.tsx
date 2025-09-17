@@ -36,8 +36,7 @@ export const Loader: React.FC<LoaderProps> = ({ progress }) => {
   return (
     <div className="flex flex-col items-center justify-center space-y-6 my-12 animate-fade-in w-full max-w-md mx-auto">
         {/* 
-          FIX: The loader icon animation was refactored to be more intuitive.
-          It now visually represents the process of "scanning" a document,
+          The loader icon visually represents the process of "scanning" a document,
           enhancing the user's understanding of the current action.
         */}
         <div className="relative w-20 h-20">

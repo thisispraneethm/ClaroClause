@@ -8,9 +8,7 @@ import { GitCompareArrowsIcon } from '../icons/GitCompareArrowsIcon';
 import { UploadIcon } from '../icons/UploadIcon';
 import { XIcon } from '../icons/XIcon';
 import { DocumentTextIcon } from '../icons/DocumentTextIcon';
-
-// Set a reasonable limit to prevent client-side DoS
-const MAX_TEXT_LENGTH = 100000; 
+import { MAX_TEXT_LENGTH } from '../../constants';
 
 interface DocumentInputProps {
     title: string;

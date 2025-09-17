@@ -2,6 +2,7 @@ import React from 'react';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { UploadIcon } from './icons/UploadIcon';
 import { XIcon } from './icons/XIcon';
+import { MAX_TEXT_LENGTH } from '../constants';
 
 interface ContractInputProps {
   value: string;
@@ -13,9 +14,6 @@ interface ContractInputProps {
   onClear: () => void;
 }
 
-// Set a reasonable limit (e.g., 100KB) to prevent client-side DoS
-const MAX_TEXT_LENGTH = 100000; 
-
 export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, onFileSelect, onDecode, isLoading, onError, onClear }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isReadingFile, setIsReadingFile] = React.useState(false);
@@ -23,7 +21,7 @@ export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, o
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // SECURITY FIX: Validate file size before reading into memory
+      // Validate file size before reading into memory to prevent performance issues.
       if (file.size > MAX_TEXT_LENGTH) {
         onError(`File is too large. Please select a file smaller than ${MAX_TEXT_LENGTH / 1000}KB.`);
         if (event.target) {
@@ -58,7 +56,7 @@ export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, o
 
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = event.target.value;
-    // FIX: To ensure consistency with file uploads, reject oversized text instead of truncating.
+    // To ensure consistency with file uploads, reject oversized text instead of truncating.
     // This prevents potential data loss and analysis of incomplete documents.
     if (newValue.length > MAX_TEXT_LENGTH) {
         // By not calling onChange, the controlled component will revert to its previous state,
@@ -76,7 +74,6 @@ export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, o
   return (
     <div className="bg-white/10 border border-white/20 rounded-2xl shadow-xl shadow-glass p-6 backdrop-blur-xl relative">
       <label htmlFor="contract-input" className="sr-only">Paste your contract, terms of service, or policy text here...</label>
-       {/* FIX: Add a clear button for better UX */}
       {hasValue && !isDisabled && (
         <button 
             onClick={onClear} 

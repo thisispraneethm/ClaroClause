@@ -47,7 +47,7 @@ const ClauseCard: React.FC<{ clause: DecodedClause & { occurrenceIndex: number }
       exit={{ opacity: 0, transition: { duration: 0.2 } }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
-      {/* FIX: The inner div handles hover transforms, preventing layout shift on elements below. */}
+      {/* The inner div handles hover transforms, preventing layout shift on elements below. */}
       <motion.div
         whileHover={{ scale: 1.015, y: -4 }}
         className={`glass-panel border-l-4 ${riskStyle.borderColorClass} rounded-r-xl rounded-b-xl backdrop-blur-sm transition-shadow duration-300 hover:shadow-2xl hover:shadow-primary/10 ${highRiskGlow}`}
@@ -120,7 +120,6 @@ const RiskGroupAccordion: React.FC<{ level: RiskLevel, clauses: (DecodedClause &
     const [isOpen, setIsOpen] = React.useState(level === RiskLevel.High); // High risk is open by default
     const riskStyle = riskStyles[level];
     const IconComponent = riskStyle.icon;
-    // FIX: Add unique ID for content area for aria-controls.
     const contentId = React.useId();
 
     if (!clauses || clauses.length === 0) return null;
@@ -179,7 +178,7 @@ interface SummaryDisplayProps {
 
 export const SummaryDisplay: React.FC<SummaryDisplayProps> = ({ clauses, isLoading, onClauseHover }) => {
   const groupedClauses = React.useMemo(() => {
-    // FIX: Calculate occurrence index for each clause to handle duplicates.
+    // Calculate occurrence index for each clause to handle duplicates.
     const clauseOccurrences: { [key: string]: number } = {};
     const clausesWithIndex = clauses.map(clause => {
         const text = clause.originalClause;

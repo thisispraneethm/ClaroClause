@@ -157,7 +157,6 @@ export const ComparisonResultDisplay: React.FC<ComparisonResultDisplayProps> = (
                 <h2 className="text-xl font-bold mb-4">Summary of Changes</h2>
                 <div className="flex flex-col sm:flex-row items-center justify-around gap-4">
                     {summaryItems.map(item => {
-                        // FIX: A component variable must be capitalized for JSX to recognize it as a component.
                         const IconComponent = changeStyles[item.type].icon;
                         return (
                             <motion.div

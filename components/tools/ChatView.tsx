@@ -3,11 +3,13 @@ import type { ChatMessage } from '../../types';
 import { SparklesIcon } from '../icons/SparklesIcon';
 import { BrainCircuitIcon } from '../icons/BrainCircuitIcon';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ClipboardListIcon } from '../icons/ClipboardListIcon';
 
 interface ChatViewProps {
   chatHistory: ChatMessage[];
   onSendMessage: (message: string) => void;
   isAiTyping: boolean;
+  onClauseClick: (clauseId: string) => void;
 }
 
 const AiTypingIndicator: React.FC = () => (
@@ -18,7 +20,37 @@ const AiTypingIndicator: React.FC = () => (
     </div>
 );
 
-const ChatBubble: React.FC<{ message: ChatMessage; onSendMessage: (msg: string) => void; isAiTyping: boolean; }> = ({ message, onSendMessage, isAiTyping }) => {
+const ParsedMessage: React.FC<{ text: string; onClauseClick: (clauseId: string) => void }> = React.memo(({ text, onClauseClick }) => {
+    // Parses the robust citation format `[Citation: clause-ID]`.
+    const parts = text.split(/(\[Citation: [a-zA-Z0-9-]+?\])/g);
+    
+    return (
+        <>
+            {parts.map((part, index) => {
+                const match = part.match(/\[Citation: ([a-zA-Z0-9-]+?)\]/);
+                if (match) {
+                    const clauseId = match[1];
+                    // The text displayed to the user can be a simplified version.
+                    const userFriendlyText = `Clause ${clauseId.split('-')[1]}`;
+                    return (
+                        <button
+                            key={index}
+                            onClick={() => onClauseClick(clauseId)}
+                            className="inline font-semibold text-primary underline decoration-primary/50 decoration-dotted underline-offset-2 hover:decoration-solid transition-all bg-primary/10 px-1 py-0.5 rounded"
+                        >
+                            <ClipboardListIcon className="inline-block w-3.5 h-3.5 mr-1 align-text-bottom" />
+                            {userFriendlyText}
+                        </button>
+                    );
+                }
+                return <React.Fragment key={index}>{part}</React.Fragment>;
+            })}
+        </>
+    );
+});
+
+
+const ChatBubble: React.FC<{ message: ChatMessage; onSendMessage: (msg: string) => void; isAiTyping: boolean; onClauseClick: (clauseId: string) => void; }> = ({ message, onSendMessage, isAiTyping, onClauseClick }) => {
   const isUser = message.sender === 'user';
   const isTyping = message.sender === 'ai' && message.text === '' && !message.error;
 
@@ -26,7 +58,6 @@ const ChatBubble: React.FC<{ message: ChatMessage; onSendMessage: (msg: string) 
   if (isTyping) {
     bubbleContent = <AiTypingIndicator />;
   } else if (message.error) {
-    // FIX: Render a retry button for better error recovery.
     bubbleContent = (
       <div className="flex flex-col items-start gap-2">
         <p>{message.error}</p>
@@ -42,7 +73,7 @@ const ChatBubble: React.FC<{ message: ChatMessage; onSendMessage: (msg: string) 
       </div>
     );
   } else {
-    bubbleContent = message.text;
+    bubbleContent = <ParsedMessage text={message.text} onClauseClick={onClauseClick} />;
   }
   
   return (
@@ -67,7 +98,7 @@ const ChatBubble: React.FC<{ message: ChatMessage; onSendMessage: (msg: string) 
   );
 };
 
-export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, isAiTyping }) => {
+export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, isAiTyping, onClauseClick }) => {
   const [input, setInput] = React.useState('');
   const chatEndRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -76,10 +107,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, 
   React.useEffect(() => {
     const container = chatContainerRef.current;
     if (container) {
-      const scrollThreshold = 100; // Only scroll if user is within 100px of the bottom
+      const scrollThreshold = 100;
       const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < scrollThreshold;
       
-      // Don't scroll aggressively if the user has scrolled up to read history
       if (isNearBottom) {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }
@@ -89,11 +119,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, 
   React.useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
-        textarea.style.height = 'auto'; // Reset height to get accurate scrollHeight
+        textarea.style.height = 'auto';
         const scrollHeight = textarea.scrollHeight;
-
         const computedStyle = window.getComputedStyle(textarea);
-        // FIX: Dynamically get max-height from CSS to avoid hardcoded values.
         const maxHeightString = computedStyle.getPropertyValue('max-height');
         const maxHeight = maxHeightString !== 'none' ? parseInt(maxHeightString, 10) : Infinity;
 
@@ -123,7 +151,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, 
   return (
     <div className="flex flex-col h-full max-w-4xl mx-auto p-4">
       <div className="flex-1 overflow-y-auto pr-2 pb-4">
-        {/* FIX: Use semantic list elements for chat history to improve accessibility. */}
         <ul ref={chatContainerRef} role="log" aria-live="polite" className="space-y-6">
             <AnimatePresence>
                 {chatHistory.map((msg) => (
@@ -135,7 +162,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, 
                         exit={{ opacity: 0, y: -10, scale: 0.95 }}
                         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                     >
-                        <ChatBubble message={msg} onSendMessage={onSendMessage} isAiTyping={isAiTyping} />
+                        <ChatBubble message={msg} onSendMessage={onSendMessage} isAiTyping={isAiTyping} onClauseClick={onClauseClick} />
                     </motion.li>
                 ))}
             </AnimatePresence>

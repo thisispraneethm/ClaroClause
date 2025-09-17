@@ -1,17 +1,19 @@
 import React from 'react';
 import type { ContractAnalysis, ChatMessage, AnalysisOptions } from './types';
 import { geminiService } from './services/geminiService';
-import { getLatestAnalysis, saveAnalysis, clearAnalysisHistory } from './services/dbService';
+import { getLatestAnalysis, saveAnalysis, getAllAnalyses, deleteAnalysis, PersistedAnalysis, updateChatHistory } from './services/dbService';
 import { Sidebar } from './components/Sidebar';
 import { AnalyzeView } from './components/tools/AnalyzeView';
 import { ChatView } from './components/tools/ChatView';
 import { HomeView } from './components/tools/HomeView';
 import { AboutView } from './components/tools/AboutView';
 import { CompareView } from './components/tools/CompareView';
+import { DraftView } from './components/tools/DraftView';
+import { HistoryView } from './components/tools/HistoryView';
 import { DisclaimerModal } from './components/DisclaimerModal';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export type Tool = 'home' | 'analyze' | 'chat' | 'compare' | 'draft' | 'about';
+export type Tool = 'home' | 'analyze' | 'chat' | 'compare' | 'draft' | 'history' | 'about';
 
 const App: React.FC = () => {
   const [activeTool, setActiveTool] = React.useState<Tool>('home');
@@ -28,287 +30,286 @@ const App: React.FC = () => {
   const [showDisclaimer, setShowDisclaimer] = React.useState<boolean>(false);
   const [analysisPending, setAnalysisPending] = React.useState<{text: string, options: AnalysisOptions} | null>(null);
 
+  const [isDrafting, setIsDrafting] = React.useState<boolean>(false);
+  const [draftResult, setDraftResult] = React.useState<string>('');
+  
+  const [history, setHistory] = React.useState<PersistedAnalysis[]>([]);
+  
+  // The ID of the current analysis is tracked to update its chat history in the database.
+  const [currentAnalysisId, setCurrentAnalysisId] = React.useState<number | undefined>(undefined);
+
+  const [citedClause, setCitedClause] = React.useState<{ text: string; occurrence: number } | null>(null);
+
   const [progress, setProgress] = React.useState<{ current: number; total: number } | null>(null);
   const mainContentRef = React.useRef<HTMLDivElement>(null);
 
+  const loadHistory = async () => {
+    const allAnalyses = await getAllAnalyses();
+    setHistory(allAnalyses);
+  };
+
   React.useEffect(() => {
-    // FIX: Hydrate application state from IndexedDB on initial load.
-    // This allows the user's session to be persisted across page reloads.
-    const loadPersistedState = async () => {
-        try {
-            const persisted = await getLatestAnalysis();
-            if (persisted) {
-                setContractText(persisted.contractText);
-                setAnalysis(persisted.analysis);
-                setAnalysisOptions(persisted.options);
-                // FIX (UX): Set the active tool to 'analyze' to immediately show the restored session.
-                setActiveTool('analyze');
-            }
-        } catch (err) {
-            console.error("Failed to load persisted state from database:", err);
-            // If the database is corrupt or fails to load, clear it to prevent a broken state.
-            await clearAnalysisHistory();
-        }
+    // Hydrate application state from IndexedDB on initial load.
+    // This allows the user's session to be restored after a page reload, including chat history.
+    const hydrateState = async () => {
+      const persisted = await getLatestAnalysis();
+      if (persisted) {
+        setContractText(persisted.contractText);
+        setAnalysis(persisted.analysis);
+        setAnalysisOptions(persisted.options);
+        setChatHistory(persisted.chatHistory || []);
+        setCurrentAnalysisId(persisted.id);
+        setIsDocumentLoaded(true);
+      }
     };
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    loadPersistedState();
-  }, []);
+    hydrateState();
+    loadHistory();
 
-  React.useEffect(() => {
-    const hasAccepted = localStorage.getItem('claroclause_disclaimer_accepted');
-    if (!hasAccepted) {
+    const hasAcceptedDisclaimer = localStorage.getItem('disclaimerAccepted') === 'true';
+    if (!hasAcceptedDisclaimer) {
         setShowDisclaimer(true);
     }
   }, []);
   
   React.useEffect(() => {
-    // FIX: This effect makes the main app content inert when the modal is open,
-    // preventing background interaction and improving accessibility.
-    const mainContent = mainContentRef.current;
-    if (mainContent) {
-        // The 'inert' property is not yet in the default TS DOM types.
-        // We cast to any to use it.
-        (mainContent as any).inert = showDisclaimer;
-    }
-  }, [showDisclaimer]);
-
-
-  const handleDisclaimerAccept = () => {
-      localStorage.setItem('claroclause_disclaimer_accepted', 'true');
-      setShowDisclaimer(false);
-      if (analysisPending) {
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          triggerAnalysis(analysisPending.text, analysisPending.options);
-          setAnalysisPending(null);
-      }
-  };
-  
-  const handleDisclaimerClose = () => {
-    setShowDisclaimer(false);
-    // If the user closes the modal, cancel the pending analysis.
-    setAnalysisPending(null);
-  };
-
-
-  const triggerAnalysis = React.useCallback(async (text: string, options: AnalysisOptions) => {
-      // Reset all states for a new analysis
-      setIsLoading(true);
-      setError(null);
-      setAnalysis(null);
-      setContractText(text);
-      setAnalysisOptions(options); // Persist options in case of retry
-      setIsDocumentLoaded(false);
-      setIsChatReady(false);
-      setChatHistory([]);
-      setProgress(null);
-
-      let resultsFound = false;
-
-      try {
-        const stream = geminiService.decodeContractStream(text, options);
-
-        for await (const event of stream) {
-          if (event.type === 'progress') {
-            setProgress(event.data);
-          } else if (event.type === 'clause') {
-            resultsFound = true;
-            setAnalysis(prev => ({
-              overallScore: prev?.overallScore || 0,
-              keyTakeaways: prev?.keyTakeaways || [],
-              clauses: [...(prev?.clauses || []), event.data],
-            }));
-          } else if (event.type === 'header') {
-            resultsFound = true;
-            setAnalysis(prev => {
-              if (!prev) return null; // Should not happen if clauses exist
-              return {
-                ...prev,
-                overallScore: event.data.overallScore,
-                keyTakeaways: event.data.keyTakeaways,
-              };
-            });
-          }
-        }
-        
-        if (!resultsFound) {
-             setError('The AI could not analyze the document. This can happen with very short, unclear, or unsupported text. Please try again with a different document.');
-        }
-
-      } catch (err) {
-        console.error(err);
-        setError(err instanceof Error ? err.message : 'Failed to analyze the document. The AI model may be busy or the response was invalid. Please try again.');
-        // FIX: The flawed check for partial results using stale state has been removed.
-        // The error message from geminiService is sufficient to indicate incomplete results.
-      } finally {
-        setIsLoading(false);
-        setProgress(null);
-      }
-  }, []);
-
-  const handleAnalyze = React.useCallback((text: string, options: AnalysisOptions) => {
-    if (!text.trim()) {
-        setError('Please provide some text to analyze.');
-        return;
-    }
-    const hasAccepted = localStorage.getItem('claroclause_disclaimer_accepted');
-    if (!hasAccepted) {
-        setAnalysisPending({ text, options });
-        setShowDisclaimer(true);
-    } else {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        triggerAnalysis(text, options);
-    }
-  }, [triggerAnalysis]);
-  
-  const handleStartAnalysis = () => {
-    setActiveTool('analyze');
-  }
-
-  const handleSendMessage = React.useCallback(async (message: string) => {
-    if (isAiTyping) return;
-
-    const userMessageId = crypto.randomUUID();
-    const aiMessageId = crypto.randomUUID();
-
-    const newUserMessage: ChatMessage = { id: userMessageId, sender: 'user', text: message };
-    const aiTypingMessage: ChatMessage = { id: aiMessageId, sender: 'ai', text: '' };
-    
-    setChatHistory(prev => [...prev.filter(m => !m.error), newUserMessage, aiTypingMessage]);
-    setIsAiTyping(true);
-    
-    try {
-      const stream = geminiService.sendChatMessageStream(message);
-      
-      for await (const chunk of stream) {
-        setChatHistory(prev => prev.map(msg => 
-            msg.id === aiMessageId ? { ...msg, text: msg.text + chunk } : msg
-        ));
-      }
-    } catch (err) {
-      console.error(err);
-      const errorText = "Sorry, I couldn't get a response from the AI.";
-      setChatHistory(prev => prev.map(msg => 
-        msg.id === aiMessageId ? { ...msg, error: errorText, text: '', originalMessage: message } : msg
-      ));
-    } finally {
-      setIsAiTyping(false);
-    }
-  }, [isAiTyping]);
-
-  const handleReset = () => {
-    setContractText('');
-    setAnalysis(null);
-    setError(null);
-    setIsDocumentLoaded(false);
-    setIsChatReady(false);
-    setActiveTool('analyze');
-    setChatHistory([]);
-    setProgress(null);
-    setAnalysisOptions(null);
-    // FIX: Clear the persisted analysis from the database.
-    clearAnalysisHistory().catch(console.error);
-  };
-  
-  React.useEffect(() => {
-    // FIX: Prevent chat initialization if an analysis error occurred.
-    // This ensures data integrity by not allowing chat on partial/failed results.
-    if (analysis && !isLoading && !error && !isChatReady && analysis.clauses.length > 0) {
-      // FIX: Persist the successful analysis to IndexedDB for session recovery.
-      if (contractText && analysisOptions) {
-        saveAnalysis(contractText, analysis, analysisOptions).catch(err => {
-            console.error("Failed to save analysis to DB:", err);
-        });
-      }
-
-      setIsDocumentLoaded(true);
+    if (isDocumentLoaded && analysis) {
       geminiService.initializeChat(analysis)
-        .then(() => {
-          setIsChatReady(true);
-        })
+        .then(() => setIsChatReady(true))
         .catch(err => {
             console.error("Failed to initialize chat:", err);
-            setError("The document was analyzed, but the chat session could not be started. Please try again.");
-            setIsChatReady(false);
+            setError("Could not initialize the chat assistant.");
         });
+    } else {
+      setIsChatReady(false);
     }
-  }, [analysis, isLoading, isChatReady, error, contractText, analysisOptions]);
+  }, [isDocumentLoaded, analysis]);
 
-  React.useEffect(() => {
-    if (activeTool === 'chat' && isChatReady && chatHistory.length === 0) {
-      setChatHistory([{ id: crypto.randomUUID(), sender: 'ai', text: "I've read the document. Feel free to ask me anything about it." }]);
+  const handleAcceptDisclaimer = () => {
+    localStorage.setItem('disclaimerAccepted', 'true');
+    setShowDisclaimer(false);
+    if (analysisPending) {
+        handleAnalyzeContract(analysisPending.text, analysisPending.options);
+        setAnalysisPending(null);
     }
-  }, [activeTool, isChatReady, chatHistory.length]);
+  };
+
+  const handleAnalyzeContract = async (text: string, options: AnalysisOptions) => {
+    if (localStorage.getItem('disclaimerAccepted') !== 'true') {
+        setAnalysisPending({ text, options });
+        setShowDisclaimer(true);
+        return;
+    }
+    
+    setError(null);
+    setIsLoading(true);
+    setAnalysis(null);
+    setChatHistory([]);
+    setIsDocumentLoaded(false);
+    setContractText(text);
+    setAnalysisOptions(options);
+
+    const tempAnalysis: ContractAnalysis = { documentTitle: "Analyzing...", overallScore: 0, keyTakeaways: [], clauses: [] };
+    
+    try {
+        for await (const event of geminiService.decodeContractStream(text, options)) {
+            if (event.type === 'progress') {
+                setProgress(event.data);
+            } else if (event.type === 'clause') {
+                tempAnalysis.clauses.push(event.data);
+                setAnalysis({ ...tempAnalysis });
+            } else if (event.type === 'header') {
+                tempAnalysis.documentTitle = event.data.documentTitle;
+                tempAnalysis.overallScore = event.data.overallScore;
+                tempAnalysis.keyTakeaways = event.data.keyTakeaways;
+            }
+        }
+        setAnalysis(tempAnalysis);
+        setIsDocumentLoaded(true);
+        const savedId = await saveAnalysis(text, tempAnalysis, options, []);
+        setCurrentAnalysisId(savedId);
+        await loadHistory();
+    } catch (e) {
+        console.error("Analysis failed:", e);
+        setError(e instanceof Error ? e.message : 'An unknown error occurred during analysis.');
+        // Clear partial analysis results on failure to prevent displaying incomplete data.
+        setAnalysis(null);
+    } finally {
+        setIsLoading(false);
+        setProgress(null);
+    }
+  };
+  
+  const handleSendMessage = async (message: string) => {
+    const userMessage: ChatMessage = { id: Date.now().toString(), sender: 'user', text: message };
+    const aiMessageId = (Date.now() + 1).toString();
+    const aiTypingMessage: ChatMessage = { id: aiMessageId, sender: 'ai', text: '' };
+    
+    // Batch the user message and AI typing indicator for a more efficient state update.
+    setIsAiTyping(true);
+    setChatHistory(prev => [...prev, userMessage, aiTypingMessage]);
+
+    try {
+      let fullResponse = '';
+      for await (const chunk of geminiService.sendChatMessageStream(message)) {
+        fullResponse += chunk;
+        setChatHistory(prev => prev.map(msg => msg.id === aiMessageId ? { ...msg, text: fullResponse } : msg));
+      }
+    } catch(e) {
+        console.error("Chat failed:", e);
+        const errorText = e instanceof Error ? e.message : 'The AI failed to respond. Please try again.';
+        // Update the typing message with an error state.
+        setChatHistory(prev => prev.map(msg => msg.id === aiMessageId ? { ...msg, text: '', error: errorText, originalMessage: message } : msg));
+    } finally {
+        setIsAiTyping(false);
+        // Persist the updated chat history to IndexedDB after the AI responds.
+        if (currentAnalysisId) {
+            // Use a callback with the setter to get the most up-to-date state after the stream.
+            setChatHistory(currentHistory => {
+                if (currentAnalysisId) {
+                    updateChatHistory(currentAnalysisId, currentHistory);
+                }
+                return currentHistory;
+            });
+        }
+    }
+  };
+
+  const handleStartNew = () => {
+      setContractText('');
+      setAnalysis(null);
+      setChatHistory([]);
+      setIsDocumentLoaded(false);
+      setError(null);
+      setCurrentAnalysisId(undefined);
+      setActiveTool('analyze');
+  };
+
+  const handleDraftDocument = async (prompt: string) => {
+    setError(null);
+    setIsDrafting(true);
+    setDraftResult('');
+    try {
+      let fullResponse = '';
+      for await (const chunk of geminiService.draftDocumentStream(prompt)) {
+        fullResponse += chunk;
+        setDraftResult(fullResponse);
+      }
+    } catch (e) {
+      console.error("Drafting failed:", e);
+      setError(e instanceof Error ? e.message : 'An unknown error occurred while drafting.');
+    } finally {
+      setIsDrafting(false);
+    }
+  };
+
+  const handleLoadAnalysis = (item: PersistedAnalysis) => {
+    setContractText(item.contractText);
+    setAnalysis(item.analysis);
+    setAnalysisOptions(item.options);
+    setChatHistory(item.chatHistory || []);
+    setCurrentAnalysisId(item.id);
+    setIsDocumentLoaded(true);
+    setError(null);
+    setActiveTool('analyze');
+  };
+
+  const handleDeleteAnalysis = async (id: number) => {
+    await deleteAnalysis(id);
+    await loadHistory();
+  };
+  
+  // Citation logic now uses unique clause IDs for 100% accuracy and performance.
+  const handleClauseCitationClick = (clauseId: string) => {
+    if (!analysis) return;
+    // Find clause by its unique ID.
+    const clauseToCite = analysis.clauses.find(c => c.id === clauseId);
+    if (clauseToCite) {
+        // The clause object already contains its text and occurrence index.
+        setCitedClause({ text: clauseToCite.originalClause, occurrence: clauseToCite.occurrenceIndex });
+        setActiveTool('analyze');
+    }
+  };
+  
+  const handleToolChange = (tool: Tool) => {
+    setError(null);
+    setCitedClause(null); // Clear citation when switching tools
+    setActiveTool(tool);
+  };
 
   const renderTool = () => {
-    switch (activeTool) {
+    switch(activeTool) {
       case 'home':
-        return <HomeView onStartAnalysis={handleStartAnalysis} />;
+        return <HomeView onStartAnalysis={() => setActiveTool('analyze')} />;
       case 'analyze':
-        return (
-          <AnalyzeView 
-            onAnalyze={handleAnalyze}
-            analysis={analysis}
-            contractText={contractText}
-            setContractText={setContractText}
-            isLoading={isLoading}
-            error={error}
-            onStartNew={handleReset}
-            progress={progress}
-            analysisOptions={analysisOptions}
-          />
-        );
+        return <AnalyzeView 
+                  onAnalyze={handleAnalyzeContract} 
+                  analysis={analysis}
+                  contractText={contractText}
+                  setContractText={setContractText}
+                  isLoading={isLoading}
+                  error={error}
+                  onStartNew={handleStartNew}
+                  progress={progress}
+                  analysisOptions={analysisOptions}
+                  citedClause={citedClause}
+                />;
       case 'chat':
-        return (
-          <ChatView 
-            chatHistory={chatHistory} 
-            onSendMessage={handleSendMessage} 
-            isAiTyping={isAiTyping}
-          />
-        );
+        return isDocumentLoaded ? 
+               <ChatView 
+                  chatHistory={chatHistory} 
+                  onSendMessage={handleSendMessage} 
+                  isAiTyping={isAiTyping}
+                  onClauseClick={handleClauseCitationClick}
+                /> : <HomeView onStartAnalysis={() => setActiveTool('analyze')} />;
       case 'compare':
-        return <CompareView initialDocument={contractText} />;
+        return <CompareView initialDocument={contractText}/>
+      case 'draft':
+        return <DraftView 
+                onDraft={handleDraftDocument} 
+                isDrafting={isDrafting} 
+                draftResult={draftResult} 
+                setDraftResult={setDraftResult}
+                error={error}
+               />
+      case 'history':
+        return <HistoryView 
+                history={history} 
+                onLoad={handleLoadAnalysis}
+                onDelete={handleDeleteAnalysis}
+               />
       case 'about':
         return <AboutView />;
       default:
-        return (
-            <div className="flex items-center justify-center h-full">
-                <div className="text-center p-8 glass-panel rounded-lg">
-                    <h2 className="text-2xl font-bold mb-2">Feature Coming Soon!</h2>
-                    <p className="text-muted-foreground">The "{activeTool}" tool is under development. Please check back later.</p>
-                </div>
-            </div>
-        )
+        return <HomeView onStartAnalysis={() => setActiveTool('analyze')} />;
     }
-  };
+  }
 
   return (
-    <div className="flex h-screen text-foreground font-sans">
-      <div ref={mainContentRef} className="flex h-full w-full">
-        <Sidebar 
-          activeTool={activeTool} 
-          setActiveTool={setActiveTool} 
-          isDocumentLoaded={isDocumentLoaded && isChatReady}
-        />
-        <main className="flex-1 overflow-y-auto">
-          <AnimatePresence mode="wait">
-              <motion.div
-                  key={activeTool}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3, ease: 'easeInOut' }}
-                  className="h-full"
-              >
-                  {renderTool()}
-              </motion.div>
-          </AnimatePresence>
-        </main>
-      </div>
+    <div className="flex h-full font-sans">
       <DisclaimerModal 
         isOpen={showDisclaimer} 
-        onAccept={handleDisclaimerAccept}
-        onClose={handleDisclaimerClose}
+        onAccept={handleAcceptDisclaimer} 
+        onClose={() => setShowDisclaimer(false)} 
       />
+      <Sidebar 
+        activeTool={activeTool} 
+        setActiveTool={handleToolChange} 
+        isDocumentLoaded={isDocumentLoaded} 
+      />
+      <main ref={mainContentRef} className="flex-1 overflow-y-auto overflow-x-hidden relative">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTool}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+              className="h-full"
+            >
+              {renderTool()}
+            </motion.div>
+          </AnimatePresence>
+      </main>
     </div>
   );
 };

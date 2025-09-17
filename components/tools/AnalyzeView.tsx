@@ -22,6 +22,7 @@ interface AnalyzeViewProps {
   onStartNew: () => void;
   progress: { current: number; total: number } | null;
   analysisOptions: AnalysisOptions | null;
+  citedClause: { text: string; occurrence: number } | null;
 }
 
 type AnalysisStep = 'input' | 'enhance' | 'processing';
@@ -40,9 +41,9 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-// --- Trust Pillar 1: Verifiability ---
+// Trust Pillar 1: Verifiability - This component highlights text for citations.
 const HighlightableText: React.FC<{ text: string, highlight: { text: string; occurrence: number } | null }> = React.memo(({ text, highlight }) => {
-    if (!highlight || !text.includes(highlight.text)) {
+    if (!highlight || !highlight.text || !text.includes(highlight.text)) {
         return <>{text}</>;
     }
 
@@ -59,17 +60,17 @@ const HighlightableText: React.FC<{ text: string, highlight: { text: string; occ
         }
 
         if (index > lastIndex) {
-            parts.push(text.substring(lastIndex, index));
+            parts.push(<React.Fragment key={`text-${key++}`}>{text.substring(lastIndex, index)}</React.Fragment>);
         }
         
         if (occurrenceCounter === highlight.occurrence) {
              parts.push(
-                <mark key={`highlight-${key++}`} id="active-highlight" className="bg-primary/30 text-primary-foreground rounded transition-all duration-300">
+                <mark key={`highlight-${key++}`} className="bg-primary/30 text-primary-foreground rounded transition-all duration-300">
                     {highlight.text}
                 </mark>
             );
         } else {
-            parts.push(highlight.text);
+            parts.push(<React.Fragment key={`match-${key++}`}>{highlight.text}</React.Fragment>);
         }
 
         occurrenceCounter++;
@@ -80,7 +81,7 @@ const HighlightableText: React.FC<{ text: string, highlight: { text: string; occ
 });
 
 
-export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, contractText, setContractText, isLoading, error, onStartNew, progress, analysisOptions }) => {
+export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, contractText, setContractText, isLoading, error, onStartNew, progress, analysisOptions, citedClause }) => {
   const [step, setStep] = React.useState<AnalysisStep>('input');
   const [hoveredClause, setHoveredClause] = React.useState<{ text: string | null, occurrence: number | null }>({ text: null, occurrence: null });
   const debouncedHoveredClause = useDebounce(hoveredClause, 300);
@@ -91,6 +92,8 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
   const [currentAnalysisOptions, setCurrentAnalysisOptions] = React.useState<AnalysisOptions>(
       analysisOptions || { persona: 'layperson', focus: '' }
   );
+
+  const highlightTarget = citedClause || debouncedHoveredClause;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputError(null);
@@ -109,8 +112,6 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
   
   const handleClearText = () => {
     setInputError(null);
-    // This now only clears the text from the input view, it doesn't reset the whole app state.
-    // The parent's onReset can do that if needed, but here we just clear the input field.
     setContractText('');
   }
   
@@ -137,9 +138,11 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
   }, [analysis, isLoading]);
 
   React.useEffect(() => {
-    if (debouncedHoveredClause.text && documentContainerRef.current) {
+    if ((debouncedHoveredClause.text || citedClause) && documentContainerRef.current) {
         const container = documentContainerRef.current;
-        const markElement = container.querySelector('#active-highlight');
+        // Query for the generic `mark` tag. Since only one highlight is active
+        // at a time, this is safe and avoids using a non-unique ID.
+        const markElement = container.querySelector('mark');
         if (markElement) {
             markElement.scrollIntoView({
                 behavior: 'smooth',
@@ -147,7 +150,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
             });
         }
     }
-  }, [debouncedHoveredClause]);
+  }, [debouncedHoveredClause, citedClause]);
 
   if (analysis) {
     return (
@@ -165,7 +168,6 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
               <div className="flex flex-col overflow-hidden bg-black/5 backdrop-blur-md rounded-lg border border-white/20 shadow-glass">
                   <div className="flex items-center justify-between p-3 border-b border-white/10">
                       <h2 className="text-sm font-semibold text-foreground">Original Document</h2>
-                       {/* FIX: Changed button from destructive "New" to non-destructive "Analyze Another" */}
                        <button 
                          onClick={onStartNew}
                          className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-md text-muted-foreground hover:bg-white/20 hover:text-foreground transition-colors"
@@ -175,7 +177,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
                        </button>
                   </div>
                   <div ref={documentContainerRef} className="p-4 text-sm text-muted-foreground overflow-y-auto font-mono whitespace-pre-wrap flex-1 pr-2">
-                      <HighlightableText text={contractText} highlight={debouncedHoveredClause} />
+                      <HighlightableText text={contractText} highlight={highlightTarget} />
                   </div>
               </div>
               <div className="overflow-y-auto pr-2">

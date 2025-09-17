@@ -24,7 +24,6 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartAnalysis }) => {
         </p>
         <div className="mt-6 flex items-center justify-center space-x-2 text-sm text-green-600">
           <LockIcon className="h-4 w-4" />
-          {/* FIX: Corrected privacy claim */}
           <span>Your document is securely processed and never stored. 100% private.</span>
         </div>
         <div className="mt-10 flex justify-center">

@@ -6,6 +6,9 @@ export enum RiskLevel {
 }
 
 export interface DecodedClause {
+  // A unique ID and occurrence index are added to each clause for robust citation.
+  id: string;
+  occurrenceIndex: number;
   title: string;
   explanation: string;
   risk: RiskLevel;
@@ -15,6 +18,7 @@ export interface DecodedClause {
 }
 
 export interface ContractAnalysis {
+  documentTitle: string;
   overallScore: number;
   keyTakeaways: string[];
   clauses: DecodedClause[];
@@ -27,7 +31,7 @@ export interface ChatMessage {
   sender: 'user' | 'ai';
   text: string;
   error?: string;
-  originalMessage?: string; // FIX: Added to support retry functionality
+  originalMessage?: string; // Used to resend the original message on error.
 }
 
 export type AnalysisPersona = 'layperson' | 'business_owner' | 'lawyer' | 'first_home_buyer' | 'explain_like_im_five';

@@ -2,12 +2,14 @@ import { GoogleGenAI, Type, Chat } from '@google/genai';
 import type { AnalysisOptions, AnalysisStreamEvent, ContractAnalysis, DecodedClause, ComparisonResult } from '../types';
 
 /**
- * A basic sanitization function to remove characters that could be used
- * in prompt injection attacks from user-provided focus text.
+ * A targeted sanitization function to mitigate prompt injection.
+ * This function is designed to be less destructive than a generic sanitizer. It removes
+ * characters like backticks, which are uncommon in legal text but are used to execute
+ * code or change formatting in prompts, while preserving common legal punctuation.
  */
 function sanitizeInput(text: string): string {
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: This is intentional for sanitization
-    return text.replace(/[<>{}[\]|`]/g, '');
+    // Removes backticks and some markdown characters. Preserves `[]` and `_` which can be valid.
+    return text.replace(/[`#*]/g, '');
 }
 
 const clauseSchema = {
@@ -31,10 +33,11 @@ const analysisSchema = {
 const headerSchema = {
     type: Type.OBJECT,
     properties: {
+        documentTitle: { type: Type.STRING, description: "A concise, descriptive title for the entire document, based on its content. E.g., 'Apartment Lease Agreement'." },
         overallScore: { type: Type.NUMBER, description: "A fairness score from 0-100, where 100 is perfectly fair and 0 is highly unfavorable." },
         keyTakeaways: { type: Type.ARRAY, items: { type: Type.STRING }, description: "A bulleted list of the 3-5 most critical findings from the entire document." },
     },
-    required: ["overallScore", "keyTakeaways"]
+    required: ["documentTitle", "overallScore", "keyTakeaways"]
 };
 
 const comparisonClauseSchema = {
@@ -81,21 +84,24 @@ class GeminiService {
   }
 
   public async initializeChat(analysis: ContractAnalysis): Promise<void> {
-    // FIX: Make chat initialization more robust. If keyTakeaways are missing,
-    // generate a fallback context from the clause titles.
-    let contextSummary: string;
-    if (analysis.keyTakeaways && analysis.keyTakeaways.length > 0) {
-        contextSummary = analysis.keyTakeaways.map(t => `- ${t}`).join('\n');
-    } else {
-        const clauseTitles = analysis.clauses.map(c => c.title).slice(0, 10).join(', ');
-        contextSummary = `The document contains clauses such as: ${clauseTitles}...`;
-    }
+    const contextSummary = (analysis.keyTakeaways && analysis.keyTakeaways.length > 0)
+        ? analysis.keyTakeaways.map(t => `- ${t}`).join('\n')
+        : `The document contains ${analysis.clauses.length} clauses.`;
+    
+    // Provide a concise summary of each clause (ID and title) instead of the full text.
+    // This prevents the system prompt from exceeding the context window limit on large documents.
+    const clauseContext = analysis.clauses.map(c => `Clause ID: ${c.id}, Title: "${c.title}"`).join('\n');
 
-    const systemInstruction = `You are a helpful assistant who is an expert in legal documents. The user has just analyzed a document.
+    const systemInstruction = `You are a helpful assistant who is an expert in legal documents. The user has just analyzed a document titled "${analysis.documentTitle}".
 Here is a summary of their document:
 ${contextSummary}
 
-Answer the user's questions about this document in a clear, concise, and helpful manner. Do not provide legal advice.`;
+Here is a list of the clause IDs and titles from the document:
+---
+${clauseContext}
+---
+
+Answer the user's questions about this document in a clear, concise, and helpful manner. When your answer is based on specific clauses, you MUST cite them by referencing their unique ID in brackets, like this: [Citation: clause-ID-goes-here]. This is mandatory for accuracy and verifiability. Do not provide legal advice.`;
 
     this.chat = this.ai.chats.create({
       model: 'gemini-2.5-flash',
@@ -118,36 +124,67 @@ Answer the user's questions about this document in a clear, concise, and helpful
     }
   }
 
+  public async *draftDocumentStream(prompt: string): AsyncGenerator<string> {
+    if (!prompt) {
+      throw new Error("Cannot send an empty prompt.");
+    }
+    const fullPrompt = `You are an AI legal assistant. A user wants to draft a document.
+    Prompt: "${prompt}"
+    Based on the prompt, generate a well-structured document. If the prompt is ambiguous, create a standard version of the requested document.`;
+
+    const result = await this.ai.models.generateContentStream({ 
+        model: 'gemini-2.5-flash',
+        contents: fullPrompt,
+    });
+    for await (const chunk of result) {
+        yield chunk.text;
+    }
+  }
+
+  /**
+   * A robust text chunking algorithm that groups paragraphs together and only splits
+   * oversized paragraphs at the last sentence boundary. This preserves semantic 
+   * context and reduces the chance of breaking a single clause across multiple chunks.
+   */
   private chunkText(text: string, chunkSize = 4000): string[] {
     const paragraphs = text.split(/\n\s*\n/);
     const chunks: string[] = [];
     let currentChunk = '';
 
     for (const paragraph of paragraphs) {
-        if (paragraph.length > chunkSize) {
+        const trimmedParagraph = paragraph.trim();
+        if (trimmedParagraph.length === 0) continue;
+
+        // If a single paragraph is larger than the chunk size, split it.
+        if (trimmedParagraph.length > chunkSize) {
             if (currentChunk.length > 0) {
                 chunks.push(currentChunk);
                 currentChunk = '';
             }
-            let remainingParagraph = paragraph;
-            while (remainingParagraph.length > chunkSize) {
-                let splitIndex = remainingParagraph.lastIndexOf(' ', chunkSize);
-                if (splitIndex === -1) { 
+            let remainingPara = trimmedParagraph;
+            while (remainingPara.length > chunkSize) {
+                // Split at the last sentence boundary before the chunk size limit.
+                let splitIndex = remainingPara.lastIndexOf('. ', chunkSize);
+                if (splitIndex === -1) { // If no sentence end, fall back to space.
+                    splitIndex = remainingPara.lastIndexOf(' ', chunkSize);
+                }
+                if (splitIndex === -1) { // If no space, hard cut.
                     splitIndex = chunkSize;
                 }
-                chunks.push(remainingParagraph.substring(0, splitIndex));
-                remainingParagraph = remainingParagraph.substring(splitIndex).trim();
+                chunks.push(remainingPara.substring(0, splitIndex + 1));
+                remainingPara = remainingPara.substring(splitIndex + 1).trim();
             }
-            currentChunk = remainingParagraph;
+            currentChunk = remainingPara;
             continue;
         }
 
-        if (currentChunk.length + paragraph.length + 2 > chunkSize && currentChunk.length > 0) {
+        // If adding the next paragraph exceeds the chunk size, push the current chunk.
+        if (currentChunk.length + trimmedParagraph.length + 2 > chunkSize && currentChunk.length > 0) {
             chunks.push(currentChunk);
             currentChunk = '';
         }
 
-        currentChunk += (currentChunk.length > 0 ? '\n\n' : '') + paragraph;
+        currentChunk += (currentChunk.length > 0 ? '\n\n' : '') + trimmedParagraph;
     }
 
     if (currentChunk.length > 0) {
@@ -169,11 +206,12 @@ Answer the user's questions about this document in a clear, concise, and helpful
   }
   
   private buildHeaderPrompt(clauses: DecodedClause[], options: AnalysisOptions): string {
-      // FIX (Scalability): Send a concise summary of each clause instead of the full text.
-      // This prevents the final summarization prompt from exceeding the context window limit.
-      const clauseText = clauses.map(c => `Clause: ${c.title}\nRisk: ${c.risk}\nExplanation: ${c.explanation.substring(0, 150)}...`).join('\n\n');
-      return `You are acting as a '${options.persona}'. Based on the following analyzed clauses from a legal document, provide a final summary.
-      Generate an overall fairness score from 0-100 and a list of the 3-5 most important key takeaways.
+      // Send only the title and risk of each clause.
+      // This drastically reduces the prompt size for the final summarization step,
+      // preventing it from exceeding the context window limit on large documents.
+      const clauseText = clauses.map(c => `Clause: ${c.title} (Risk: ${c.risk})`).join('\n');
+      return `You are acting as a '${options.persona}'. Based on the following list of analyzed clauses from a legal document, provide a final summary.
+      Generate a document title, an overall fairness score from 0-100 and a list of the 3-5 most important key takeaways.
       ${options.focus ? `The user was specifically interested in: ${options.focus}.` : ''}
       
       Here are the clauses:
@@ -184,7 +222,6 @@ Answer the user's questions about this document in a clear, concise, and helpful
   }
 
   public async *decodeContractStream(contractText: string, options: AnalysisOptions): AsyncGenerator<AnalysisStreamEvent> {
-    // FIX (Security): Sanitize all user-provided inputs to mitigate prompt injection.
     const sanitizedContractText = sanitizeInput(contractText);
     const sanitizedOptions: AnalysisOptions = {
         ...options,
@@ -195,13 +232,12 @@ Answer the user's questions about this document in a clear, concise, and helpful
     const totalChunks = chunks.length;
     let processedChunks = 0;
     const allClauses: DecodedClause[] = [];
+    
+    // A map to track occurrences of each unique clause text for robust highlighting.
+    const clauseOccurrences: { [key: string]: number } = {};
 
     yield { type: 'progress', data: { current: 0, total: totalChunks } };
     
-    // FIX: Process chunks sequentially to provide accurate, smooth progress updates.
-    // The previous implementation using .map() and a for...of loop over promises
-    // started all requests in parallel, causing progress updates to be batched
-    // and misleadingly fast. This new loop ensures one chunk is processed at a time.
     for (const chunk of chunks) {
         try {
             const response = await this.ai.models.generateContent({
@@ -212,14 +248,30 @@ Answer the user's questions about this document in a clear, concise, and helpful
                     responseSchema: analysisSchema,
                 },
             });
-            const clauses = JSON.parse(response.text) as DecodedClause[];
-            for (const clause of clauses) {
+            const responseText = response.text?.trim();
+            if (!responseText) {
+                 console.warn("Received empty response for a chunk, skipping.");
+                 continue;
+            }
+            // The AI returns a partial clause object; we enrich it with our own metadata.
+            const partialClauses = JSON.parse(responseText) as Omit<DecodedClause, 'id' | 'occurrenceIndex'>[];
+
+            for (const partialClause of partialClauses) {
+                const text = partialClause.originalClause;
+                const count = clauseOccurrences[text] || 0;
+                clauseOccurrences[text] = count + 1;
+                
+                // Enrich the clause with a unique ID and its occurrence index.
+                const clause: DecodedClause = {
+                    ...partialClause,
+                    id: `clause-${allClauses.length}`,
+                    occurrenceIndex: count,
+                };
+
                 allClauses.push(clause);
                 yield { type: 'clause', data: clause };
             }
         } catch(e) {
-            // FIX: Prevent silent data loss. If a chunk fails, abort the entire analysis
-            // and throw an error to be displayed to the user. This ensures data integrity.
             console.error("Failed to process a contract chunk:", e);
             throw new Error(`Analysis failed while processing a part of the document. The results shown are incomplete.`);
         } finally {
@@ -242,15 +294,12 @@ Answer the user's questions about this document in a clear, concise, and helpful
             yield { type: 'header', data: JSON.parse(response.text) };
         } catch (e) {
             console.error("Failed to generate analysis header:", e);
-            // If the header fails, the user still has the clauses. We can allow this to fail gracefully.
-            // But we should still inform the user. We will throw a less severe error.
             throw new Error('Could not generate the final summary, but the clause breakdown is available.');
         }
     }
   }
 
   public async compareDocuments(docA: string, docB: string): Promise<ComparisonResult> {
-      // FIX (Security): Sanitize all user-provided inputs to mitigate prompt injection.
       const sanitizedDocA = sanitizeInput(docA);
       const sanitizedDocB = sanitizeInput(docB);
 

@@ -10,7 +10,6 @@ interface DisclaimerModalProps {
 }
 
 export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ isOpen, onAccept, onClose }) => {
-  // FIX: Create a ref for the accept button to manage focus.
   const acceptButtonRef = React.useRef<HTMLButtonElement>(null);
   
   React.useEffect(() => {
@@ -22,7 +21,7 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ isOpen, onAcce
     
     if (isOpen) {
       document.addEventListener('keydown', handleKeyDown);
-      // FIX: When the modal opens, move focus to the primary action button.
+      // When the modal opens, move focus to the primary action button.
       // A short timeout ensures the element is rendered and focusable.
       setTimeout(() => {
         acceptButtonRef.current?.focus();

@@ -14,7 +14,7 @@ const personas: { id: AnalysisPersona; name: string; description: string }[] = [
 interface PromptEnhancerProps {
     onAnalyze: (options: AnalysisOptions) => void;
     onBack: () => void;
-    // FIX: Convert to a controlled component to persist state externally.
+    // This is a controlled component; its state is managed by the parent.
     options: AnalysisOptions;
     onOptionsChange: (options: AnalysisOptions) => void;
 }
