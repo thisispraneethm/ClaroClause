@@ -65,9 +65,13 @@ export async function deleteAnalysis(id: number): Promise<void> {
     await db.analyses.delete(id);
 }
 
-// Updates the chat history for a specific analysis.
-export async function updateChatHistory(id: number, chatHistory: ChatMessage[]): Promise<void> {
-    await db.analyses.update(id, { chatHistory });
+/**
+ * Updates the chat history for a specific analysis.
+ * @returns {Promise<boolean>} - True if the update was successful, false otherwise.
+ */
+export async function updateChatHistory(id: number, chatHistory: ChatMessage[]): Promise<boolean> {
+    const updatedCount = await db.analyses.update(id, { chatHistory });
+    return updatedCount > 0;
 }
 
 export async function clearAnalysisHistory(): Promise<void> {

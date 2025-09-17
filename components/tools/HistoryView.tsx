@@ -37,6 +37,11 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
         return item.analysis.clauses.length;
     }, [item.analysis.clauses]);
 
+    const handleDelete = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent the parent button's onLoad from firing.
+        onDelete();
+    };
+
     return (
         <motion.div
             layout
@@ -44,45 +49,42 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
               hidden: { opacity: 0, y: 20 },
               visible: { opacity: 1, y: 0 },
             }}
-            whileHover={{ y: -4, transition: { duration: 0.2 } }}
             exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-            className="glass-panel p-4 rounded-xl flex items-center justify-between transition-colors duration-200 hover:bg-white/5"
         >
-            <div className="flex-1 overflow-hidden">
-                <h3 className="font-semibold truncate pr-2 text-card-foreground" title={item.documentTitle}>
-                    {item.documentTitle || 'Untitled Document'}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                    Analyzed on {formatDate(item.createdAt)}
-                </p>
-                {totalClauses > 0 && (
-                  <div className="mt-3 w-full h-2 flex rounded-full overflow-hidden bg-secondary" title="Risk profile">
-                    {riskItems.map(risk => {
-                      const count = riskCounts[risk.level] || 0;
-                      if (count === 0) return null;
-                      const percentage = (count / totalClauses) * 100;
-                      return <div key={risk.level} className={`${risk.color}`} style={{ width: `${percentage}%` }} />;
-                    })}
-                  </div>
-                )}
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-                <button 
-                    onClick={onLoad}
-                    title="Load Analysis"
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md text-muted-foreground bg-secondary/50 hover:bg-secondary hover:text-foreground transition-colors border border-border"
-                >
-                    <ClipboardListIcon className="w-4 h-4" />
-                    Load
-                </button>
-                <button
-                    onClick={onDelete}
-                    title="Delete Analysis"
-                    className="p-2 rounded-full text-muted-foreground hover:bg-red-500/20 hover:text-red-400 transition-colors"
-                >
-                    <XIcon className="w-4 h-4" />
-                </button>
-            </div>
+            <button
+                onClick={onLoad}
+                aria-label={`Load analysis for ${item.documentTitle || 'Untitled Document'}`}
+                className="w-full text-left glass-panel p-4 rounded-xl flex items-center justify-between transition-all duration-200 hover:bg-white/5 hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                <div className="flex-1 overflow-hidden">
+                    <h3 className="font-semibold truncate pr-2 text-card-foreground" title={item.documentTitle}>
+                        {item.documentTitle || 'Untitled Document'}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                        Analyzed on {formatDate(item.createdAt)}
+                    </p>
+                    {totalClauses > 0 && (
+                      <div className="mt-3 w-full h-2 flex rounded-full overflow-hidden bg-secondary" title="Risk profile">
+                        {riskItems.map(risk => {
+                          const count = riskCounts[risk.level] || 0;
+                          if (count === 0) return null;
+                          const percentage = (count / totalClauses) * 100;
+                          return <div key={risk.level} className={`${risk.color}`} style={{ width: `${percentage}%` }} />;
+                        })}
+                      </div>
+                    )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0 pl-4">
+                    <button
+                        onClick={handleDelete}
+                        title="Delete Analysis"
+                        aria-label={`Delete analysis for ${item.documentTitle || 'Untitled Document'}`}
+                        className="p-2 rounded-full text-muted-foreground hover:bg-red-500/20 hover:text-red-400 transition-colors z-10"
+                    >
+                        <XIcon className="w-4 h-4" />
+                    </button>
+                </div>
+            </button>
         </motion.div>
     );
 };

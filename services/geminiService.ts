@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type, Chat } from '@google/genai';
 import { MAX_COMPARE_TEXT_LENGTH } from '../constants';
 import type { AnalysisOptions, AnalysisStreamEvent, ContractAnalysis, DecodedClause, ComparisonResult } from '../types';
+import { RiskLevel } from '../types';
 
 /**
  * A targeted sanitization function to mitigate prompt injection.
@@ -12,6 +13,37 @@ function sanitizeInput(text: string): string {
     // Removes backticks and some markdown characters. Preserves `[]` and `_` which can be valid.
     return text.replace(/[`#*]/g, '');
 }
+
+/**
+ * FIX: Added a validation layer for AI-generated clause data.
+ * This function ensures that the data structure conforms to the application's expectations,
+ * preventing crashes from unexpected or malformed API responses (e.g., an invalid 'risk' enum value).
+ * It provides safe default values for missing or invalid fields.
+ */
+function validateClause(partialClause: any): Omit<DecodedClause, 'id' | 'occurrenceIndex'> {
+    const riskValues = Object.values(RiskLevel);
+    const confidenceValues = ['High', 'Medium', 'Low'];
+
+    // Ensure risk is a valid enum value, otherwise default to 'Unknown'.
+    const validatedRisk = partialClause.risk && riskValues.includes(partialClause.risk)
+        ? partialClause.risk
+        : RiskLevel.Unknown;
+
+    // Ensure confidence is a valid enum value, otherwise default to 'Low'.
+    const validatedConfidence = partialClause.confidence && confidenceValues.includes(partialClause.confidence)
+        ? partialClause.confidence
+        : 'Low';
+    
+    return {
+        title: typeof partialClause.title === 'string' ? partialClause.title : "Untitled Clause",
+        explanation: typeof partialClause.explanation === 'string' ? partialClause.explanation : "No explanation provided.",
+        risk: validatedRisk,
+        originalClause: typeof partialClause.originalClause === 'string' ? partialClause.originalClause : "",
+        confidence: validatedConfidence,
+        goodToKnow: partialClause.goodToKnow === true, // Coerce to boolean
+    };
+}
+
 
 const clauseSchema = {
     type: Type.OBJECT,
@@ -125,13 +157,16 @@ Answer the user's questions about this document in a clear, concise, and helpful
     if (!message) {
       throw new Error("Cannot send an empty message.");
     }
+    
+    // FIX: Sanitize user input to mitigate prompt injection.
+    const sanitizedMessage = sanitizeInput(message);
 
     this.cancelOngoingStreams();
     this.streamAbortController = new AbortController();
     const signal = this.streamAbortController.signal;
 
     try {
-        const result = await this.chat.sendMessageStream({ message });
+        const result = await this.chat.sendMessageStream({ message: sanitizedMessage });
         for await (const chunk of result) {
             if (signal.aborted) { 
                 console.log("Chat stream aborted.");
@@ -148,8 +183,11 @@ Answer the user's questions about this document in a clear, concise, and helpful
     if (!prompt) {
       throw new Error("Cannot send an empty prompt.");
     }
+    // FIX: Sanitize user input to mitigate prompt injection.
+    const sanitizedPrompt = sanitizeInput(prompt);
+    
     const fullPrompt = `You are an AI legal assistant. A user wants to draft a document.
-    Prompt: "${prompt}"
+    Prompt: "${sanitizedPrompt}"
     Based on the prompt, generate a well-structured document. If the prompt is ambiguous, create a standard version of the requested document.`;
 
     this.cancelOngoingStreams();
@@ -282,9 +320,18 @@ Answer the user's questions about this document in a clear, concise, and helpful
                     console.warn("Received empty response for a chunk, skipping.");
                     continue;
                 }
-                const partialClauses = JSON.parse(responseText) as Omit<DecodedClause, 'id' | 'occurrenceIndex'>[];
+                
+                // FIX: Instead of casting directly, parse and then validate each item.
+                // This makes the application resilient to malformed or incomplete data from the AI.
+                const parsedData = JSON.parse(responseText);
+                const partialClauses = Array.isArray(parsedData) ? parsedData : [];
 
-                for (const partialClause of partialClauses) {
+                for (const rawClause of partialClauses) {
+                    const partialClause = validateClause(rawClause);
+
+                    // Do not add clauses with no original text, as they are likely parsing errors.
+                    if (!partialClause.originalClause) continue;
+
                     const text = partialClause.originalClause;
                     const count = clauseOccurrences[text] || 0;
                     clauseOccurrences[text] = count + 1;

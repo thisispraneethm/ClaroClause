@@ -59,6 +59,7 @@ type AppAction =
   | { type: 'CHAT_RESPONSE_FAILURE'; payload: { id: string; error: string; originalMessage: string } }
   | { type: 'FINISH_CHAT_STREAM' }
   | { type: 'RESET_ACTIVE_ANALYSIS' }
+  | { type: 'ANALYSIS_DELETED_EXTERNALLY' }
   | { type: 'SET_CITED_CLAUSE'; payload: { text: string; occurrence: number } | null }
   | { type: 'CLEAR_ERROR' };
 
@@ -230,6 +231,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
             activeTool: 'history',
             isChatReady: false,
         };
+    case 'ANALYSIS_DELETED_EXTERNALLY':
+        // FIX: Handle the case where the active analysis was deleted (e.g., in another tab).
+        // This provides clear feedback to the user and prevents silent failures.
+        return {
+            ...state,
+            contractText: '',
+            analysis: null,
+            chatHistory: [],
+            isDocumentLoaded: false,
+            error: 'The current analysis was deleted, possibly in another tab. Please load or start a new analysis.',
+            currentAnalysisId: undefined,
+            activeTool: 'history',
+            isChatReady: false,
+        };
     case 'SET_CITED_CLAUSE':
       return { ...state, citedClause: action.payload, activeTool: 'analyze' };
     default:
@@ -246,6 +261,24 @@ const App: React.FC = () => {
     dispatch({ type: 'SET_HISTORY', payload: allAnalyses });
   };
 
+  /**
+   * FIX: Extracted chat initialization into a retryable, memoized function.
+   * This prevents re-running the initialization on every render and allows the
+   * ChatView to offer a "retry" option if the initial connection fails.
+   */
+  const handleInitializeChat = React.useCallback(async () => {
+    if (state.isDocumentLoaded && state.analysis) {
+        try {
+            await geminiService.initializeChat(state.analysis);
+            dispatch({ type: 'CHAT_INIT_SUCCESS' });
+        } catch (err) {
+            console.error("Failed to initialize chat:", err);
+            dispatch({ type: 'CHAT_INIT_FAILURE', payload: "Could not initialize the chat assistant." });
+        }
+    }
+  }, [state.isDocumentLoaded, state.analysis]);
+
+
   React.useEffect(() => {
     const hydrateState = async () => {
       const persisted = await getLatestAnalysis();
@@ -259,14 +292,9 @@ const App: React.FC = () => {
 
   React.useEffect(() => {
     if (state.isDocumentLoaded && state.analysis) {
-      geminiService.initializeChat(state.analysis)
-        .then(() => dispatch({ type: 'CHAT_INIT_SUCCESS' }))
-        .catch(err => {
-          console.error("Failed to initialize chat:", err);
-          dispatch({ type: 'CHAT_INIT_FAILURE', payload: "Could not initialize the chat assistant." });
-        });
+        handleInitializeChat();
     }
-  }, [state.isDocumentLoaded, state.analysis]);
+  }, [state.isDocumentLoaded, state.analysis, handleInitializeChat]);
 
   const handleAcceptDisclaimer = () => {
     localStorage.setItem('disclaimerAccepted', 'true');
@@ -354,13 +382,27 @@ const App: React.FC = () => {
   
    // Persist chat history whenever it changes, but not while AI is typing.
   React.useEffect(() => {
-    if (state.currentAnalysisId && !state.isAiTyping && state.chatHistory.length > 0) {
-      // Ensure we don't save during initial hydration or loading.
-      const lastMessage = state.chatHistory[state.chatHistory.length - 1];
-      if(lastMessage.sender === 'ai' && lastMessage.text === '' && !lastMessage.error) return;
-
-      updateChatHistory(state.currentAnalysisId, state.chatHistory);
+    if (!state.currentAnalysisId || state.isAiTyping || state.chatHistory.length === 0) {
+        return;
     }
+    
+    // Ensure we don't save during initial hydration or loading.
+    const lastMessage = state.chatHistory[state.chatHistory.length - 1];
+    if (lastMessage.sender === 'ai' && lastMessage.text === '' && !lastMessage.error) {
+        return;
+    }
+
+    const persistHistory = async () => {
+        const success = await updateChatHistory(state.currentAnalysisId!, state.chatHistory);
+        // FIX: Handle race condition where the analysis was deleted in another tab.
+        // If the update fails, it means the record is gone, so we should reset the view.
+        if (!success) {
+            console.warn(`Analysis ID ${state.currentAnalysisId} could not be updated. It may have been deleted.`);
+            dispatch({ type: 'ANALYSIS_DELETED_EXTERNALLY' });
+        }
+    };
+    persistHistory();
+    
   }, [state.chatHistory, state.isAiTyping, state.currentAnalysisId]);
 
   const handleDeleteAnalysis = async (id: number) => {
@@ -409,6 +451,8 @@ const App: React.FC = () => {
             onRetryMessage={handleRetryMessage}
             isAiTyping={state.isAiTyping}
             onClauseClick={handleClauseCitationClick}
+            isChatReady={state.isChatReady}
+            onRetryInit={handleInitializeChat}
           /> : <HomeView onStartAnalysis={() => dispatch({ type: 'SET_TOOL', payload: 'analyze' })} />;
       case 'compare':
         return <CompareView initialDocument={state.contractText} />

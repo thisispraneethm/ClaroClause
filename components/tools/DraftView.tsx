@@ -12,6 +12,7 @@ export const DraftView: React.FC = () => {
   const [error, setError] = React.useState<string | null>(null);
   
   const [copyStatus, setCopyStatus] = React.useState<'Copy' | 'Copied!'>('Copy');
+  const promptTextareaRef = React.useRef<HTMLTextAreaElement>(null);
   const resultTextareaRef = React.useRef<HTMLTextAreaElement>(null);
   const copyTimeoutRef = React.useRef<number | null>(null);
 
@@ -60,8 +61,17 @@ export const DraftView: React.FC = () => {
       console.error('Failed to copy text: ', err);
     });
   };
+
+  // Auto-resize the prompt textarea.
+  React.useEffect(() => {
+    const textarea = promptTextareaRef.current;
+    if (textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [prompt]);
   
-  // Auto-resize the textarea as content streams in or is edited by the user.
+  // Auto-resize the result textarea as content streams in or is edited by the user.
   React.useEffect(() => {
     const textarea = resultTextareaRef.current;
     if (textarea) {
@@ -86,10 +96,12 @@ export const DraftView: React.FC = () => {
       <div className="w-full max-w-4xl mt-8">
         <div className="glass-panel p-6 rounded-2xl relative">
           <textarea
+            ref={promptTextareaRef}
+            rows={1}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="e.g., a simple non-disclosure agreement for a freelance project..."
-            className="w-full h-32 p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner"
+            className="w-full min-h-[8rem] p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner"
             disabled={isDrafting}
           />
           <div className="mt-6 flex justify-end">

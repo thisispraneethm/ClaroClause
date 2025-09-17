@@ -11,6 +11,8 @@ interface ChatViewProps {
   onRetryMessage: (message: string) => void;
   isAiTyping: boolean;
   onClauseClick: (clauseId: string) => void;
+  isChatReady: boolean;
+  onRetryInit: () => void;
 }
 
 const AiTypingIndicator: React.FC = () => (
@@ -142,7 +144,33 @@ const EmptyState: React.FC<{ onSendMessage: (msg: string) => void }> = ({ onSend
     );
 };
 
-export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, onRetryMessage, isAiTyping, onClauseClick }) => {
+/**
+ * FIX: Added a dedicated error state for when the chat assistant fails to initialize.
+ * This provides clear feedback to the user and a path to recovery, fixing a UX
+ * dead-end where the chat would silently fail.
+ */
+const InitErrorState: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
+    <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in p-4">
+        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+            <BrainCircuitIcon className="w-8 h-8 text-destructive" />
+        </div>
+        <h2 className="text-2xl font-bold">Chat Unavailable</h2>
+        <p className="text-muted-foreground mt-2 max-w-md">
+            The chat assistant could not be initialized. This might be a temporary connection issue.
+        </p>
+        <div className="mt-6">
+            <button
+                onClick={onRetry}
+                className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary/50 border border-border rounded-full hover:bg-secondary transition-all duration-200"
+            >
+                Try Again
+            </button>
+        </div>
+    </div>
+);
+
+
+export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, onRetryMessage, isAiTyping, onClauseClick, isChatReady, onRetryInit }) => {
   const [input, setInput] = React.useState('');
   const chatEndRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -195,7 +223,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, 
   return (
     <div className="flex flex-col h-full max-w-4xl mx-auto">
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {chatHistory.length === 0 && !isAiTyping ? (
+        {!isChatReady ? (
+            <InitErrorState onRetry={onRetryInit} />
+        ) : chatHistory.length === 0 && !isAiTyping ? (
             <EmptyState onSendMessage={onSendMessage} />
         ) : (
             <ul ref={chatContainerRef} role="log" aria-live="polite" className="space-y-6">
@@ -232,13 +262,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, 
                   onKeyDown={handleKeyDown}
                   placeholder={isAiTyping ? "AI is responding..." : "Ask a question about the document..."}
                   className="flex-1 bg-transparent border-none text-base placeholder-muted-foreground focus:ring-0 disabled:opacity-50 resize-none max-h-40 overflow-y-auto"
-                  disabled={isAiTyping}
+                  disabled={isAiTyping || !isChatReady}
                   aria-label="Chat input"
               />
               <button 
                   type="submit"
-                  className="w-10 h-10 flex-shrink-0 bg-primary text-primary-foreground rounded-full flex items-center justify-center hover:bg-primary/90 transition-all duration-200 disabled:opacity-50 disabled:scale-90"
-                  disabled={!input.trim() || isAiTyping}
+                  className="w-10 h-10 flex-shrink-0 bg-primary text-primary-foreground rounded-full flex items-center justify-center hover:bg-primary/90 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:scale-90"
+                  disabled={!input.trim() || isAiTyping || !isChatReady}
                   aria-label="Send message"
               >
                   <PaperAirplaneIcon className="w-5 h-5" />
