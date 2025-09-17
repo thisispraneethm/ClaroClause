@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type, Chat } from '@google/genai';
+import { MAX_COMPARE_TEXT_LENGTH } from '../constants';
 import type { AnalysisOptions, AnalysisStreamEvent, ContractAnalysis, DecodedClause, ComparisonResult } from '../types';
 
 /**
@@ -350,6 +351,13 @@ Answer the user's questions about this document in a clear, concise, and helpful
   }
 
   public async compareDocuments(docA: string, docB: string): Promise<ComparisonResult> {
+      // Preemptively validate the combined length of the documents to prevent
+      // an inevitable API failure due to exceeding the model's token limit.
+      // This provides a much clearer, faster error message to the user.
+      if (docA.length + docB.length > MAX_COMPARE_TEXT_LENGTH) {
+          throw new Error(`The combined size of the documents is too large to be compared at once. Please shorten one or both documents and try again.`);
+      }
+
       const sanitizedDocA = sanitizeInput(docA);
       const sanitizedDocB = sanitizeInput(docB);
 

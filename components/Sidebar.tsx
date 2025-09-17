@@ -19,8 +19,9 @@ interface SidebarProps {
 const Tooltip: React.FC<{ text: string; children: React.ReactElement; id: string }> = ({ text, children, id }) => {
     return (
         <div className="relative group flex items-center">
-            {/* FIX: The computed property syntax for `aria-describedby` was causing a TypeScript type error. Changed to a string literal key. */}
-            {React.cloneElement(children, { 'aria-describedby': id })}
+            {/* FIX: The `aria-describedby` prop was passed as a string literal key, causing a TypeScript error.
+                Cloning the element and adding the prop directly resolves the issue. */}
+            {React.cloneElement(children, { "aria-describedby": id })}
             <div 
                 id={id}
                 role="tooltip"
