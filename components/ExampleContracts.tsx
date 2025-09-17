@@ -34,13 +34,13 @@ export const ExampleContracts: React.FC<ExampleContractsProps> = ({ onSelect }) 
       <div className="flex items-center justify-center gap-3">
         <button
           onClick={() => onSelect(examples.privacyPolicy)}
-          className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-white/20 border border-white/30 rounded-full hover:bg-white/40 transition-all duration-200"
+          className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-card border border rounded-full hover:bg-muted/20 transition-all duration-200"
         >
           Privacy Policy
         </button>
         <button
           onClick={() => onSelect(examples.rentalAgreement)}
-          className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-white/20 border border-white/30 rounded-full hover:bg-white/40 transition-all duration-200"
+          className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-card border border rounded-full hover:bg-muted/20 transition-all duration-200"
         >
           Rental Agreement
         </button>

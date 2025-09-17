@@ -11,14 +11,25 @@ interface SummaryHeaderProps {
 }
 
 const ScoreCircle: React.FC<{ score: number }> = ({ score }) => {
-  const circumference = 2 * Math.PI * 45;
+  const circumference = 2 * Math.PI * 46;
 
-  let colorClass = 'text-green-500';
-  if (score < 75) colorClass = 'text-yellow-500';
-  if (score < 50) colorClass = 'text-red-500';
+  let colorClass = 'text-risk-low';
+  let gradientFrom = '#34d399'; // risk-low
+  let gradientTo = '#a7f3d0';
+
+  if (score < 75) {
+      colorClass = 'text-risk-medium';
+      gradientFrom = '#fbbf24'; // risk-medium
+      gradientTo = '#fde68a';
+  }
+  if (score < 50) {
+      colorClass = 'text-risk-high';
+      gradientFrom = '#f87171'; // risk-high
+      gradientTo = '#fca5a5';
+  }
   
-  const progressSpring = useSpring(0, { stiffness: 30, damping: 20 });
-  const scoreSpring = useSpring(0, { stiffness: 50, damping: 25 });
+  const progressSpring = useSpring(0, { stiffness: 30, damping: 20, restDelta: 0.001 });
+  const scoreSpring = useSpring(0, { stiffness: 50, damping: 25, restDelta: 0.1 });
   
   React.useEffect(() => {
     progressSpring.set(score / 100);
@@ -27,29 +38,35 @@ const ScoreCircle: React.FC<{ score: number }> = ({ score }) => {
 
   const offset = useTransform(progressSpring, (p) => circumference - p * circumference);
   const displayScore = useTransform(scoreSpring, (v) => Math.round(v));
+  const uniqueGradientId = React.useId();
 
   return (
     <div className="relative w-32 h-32">
       <svg className="w-full h-full" viewBox="0 0 100 100">
+        <defs>
+          <linearGradient id={uniqueGradientId} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={gradientFrom} />
+            <stop offset="100%" stopColor={gradientTo} />
+          </linearGradient>
+        </defs>
         {/* Background circle */}
         <circle
-          className="text-gray-500/20"
+          className="text-border"
           strokeWidth="8"
           stroke="currentColor"
           fill="transparent"
-          r="45"
+          r="46"
           cx="50"
           cy="50"
         />
         {/* Progress circle */}
         <motion.circle
-          className={colorClass}
           strokeWidth="8"
           strokeDasharray={circumference}
           strokeLinecap="round"
-          stroke="currentColor"
+          stroke={`url(#${uniqueGradientId})`}
           fill="transparent"
-          r="45"
+          r="46"
           cx="50"
           cy="50"
           transform="rotate(-90 50 50)"
@@ -57,10 +74,10 @@ const ScoreCircle: React.FC<{ score: number }> = ({ score }) => {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span className={`text-3xl font-bold ${colorClass}`}>
+        <motion.span className={`text-4xl font-bold font-serif ${colorClass}`}>
             {displayScore}
         </motion.span>
-        <span className="text-xs text-muted-foreground">Contract Score</span>
+        <span className="text-xs text-muted-foreground mt-1">Fairness Score</span>
       </div>
     </div>
   );
@@ -93,9 +110,9 @@ ${analysis.keyTakeaways.map(t => `- ${t}`).join('\n')}
     };
 
     const riskItems = [
-        { level: RiskLevel.Low, color: 'bg-green-500', label: 'Low Risk' },
-        { level: RiskLevel.Medium, color: 'bg-yellow-500', label: 'Medium Risk' },
-        { level: RiskLevel.High, color: 'bg-red-500', label: 'High Risk' },
+        { level: RiskLevel.Low, color: 'bg-risk-low', label: 'Low Risk' },
+        { level: RiskLevel.Medium, color: 'bg-risk-medium', label: 'Medium Risk' },
+        { level: RiskLevel.High, color: 'bg-risk-high', label: 'High Risk' },
     ];
 
     return (
@@ -118,13 +135,13 @@ ${analysis.keyTakeaways.map(t => `- ${t}`).join('\n')}
                     </div>
                 </div>
                 <div className="md:col-span-2 md:pl-4">
-                    <div className="flex justify-between items-start mb-3">
-                        <h2 className="text-xl font-bold text-card-foreground">Key Takeaways</h2>
+                    <div className="flex justify-between items-start mb-4">
+                        <h2 className="text-2xl font-bold text-card-foreground font-serif">Key Takeaways</h2>
                         <button
                             onClick={handleCopySummary}
-                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 text-xs rounded-md text-muted-foreground hover:bg-white/20 hover:text-foreground transition-all duration-200"
+                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground hover:bg-muted/20 hover:text-foreground transition-all duration-200"
                         >
-                            {copyStatus === 'Copied!' ? <CheckCircleIcon className="w-3.5 h-3.5 text-green-500" /> : <CopyIcon className="w-3.5 h-3.5" />}
+                            {copyStatus === 'Copied!' ? <CheckCircleIcon className="w-3.5 h-3.5 text-risk-low" /> : <CopyIcon className="w-3.5 h-3.5" />}
                             <span>{copyStatus} Summary</span>
                         </button>
                     </div>

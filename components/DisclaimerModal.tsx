@@ -41,15 +41,15 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ isOpen, onAcce
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 z-50"
           onClick={onClose}
         >
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
+            initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="glass-panel bg-white/70 rounded-2xl p-8 max-w-lg w-full relative"
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className="glass-panel p-8 max-w-lg w-full relative rounded-2xl border-border"
             onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
             role="dialog"
             aria-modal="true"
@@ -64,7 +64,7 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ isOpen, onAcce
             </button>
             <div className="flex items-center gap-3">
               <InfoIcon className="w-6 h-6 text-primary" />
-              <h2 id="disclaimer-title" className="text-2xl font-bold">Before You Proceed</h2>
+              <h2 id="disclaimer-title" className="text-2xl font-bold font-serif">Before You Proceed</h2>
             </div>
             <p className="mt-4 text-muted-foreground">
               ClaroClause is an AI-powered tool designed to provide simplified explanations of complex texts. It is not a substitute for professional legal advice.

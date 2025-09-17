@@ -65,7 +65,7 @@ const HighlightableText: React.FC<{ text: string, highlight: { text: string; occ
         
         if (occurrenceCounter === highlight.occurrence) {
              parts.push(
-                <mark key={`highlight-${key++}`} className="bg-primary/30 text-primary-foreground rounded transition-all duration-300">
+                <mark key={`highlight-${key++}`} className="transition-all duration-300">
                     {highlight.text}
                 </mark>
             );
@@ -156,31 +156,31 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
     return (
       <div className="h-full flex flex-col">
           {error && (
-            <div className="flex items-start p-4 m-6 mb-0 bg-destructive/80 text-destructive-foreground rounded-lg text-sm">
-                <InfoIcon className="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start p-4 m-6 mb-0 bg-destructive/20 text-destructive-foreground rounded-lg text-sm border border-destructive/30">
+                <InfoIcon className="w-5 h-5 mr-3 text-destructive flex-shrink-0 mt-0.5" />
                 <div>
                     <h4 className="font-semibold">Analysis Incomplete</h4>
-                    <p className="mt-1">{error}</p>
+                    <p className="mt-1 opacity-90">{error}</p>
                 </div>
             </div>
            )}
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 overflow-hidden">
-              <div className="flex flex-col overflow-hidden bg-black/5 backdrop-blur-md rounded-lg border border-white/20 shadow-glass">
-                  <div className="flex items-center justify-between p-3 border-b border-white/10">
-                      <h2 className="text-sm font-semibold text-foreground">Original Document</h2>
+              <div className="flex flex-col overflow-hidden glass-panel rounded-xl">
+                  <div className="flex items-center justify-between p-3 border-b border-border flex-shrink-0">
+                      <h2 className="text-sm font-semibold text-foreground truncate pr-4">{analysis.documentTitle}</h2>
                        <button 
                          onClick={onStartNew}
-                         className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-md text-muted-foreground hover:bg-white/20 hover:text-foreground transition-colors"
+                         className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground bg-card/50 hover:bg-muted/20 hover:text-foreground transition-colors border border-border"
                        >
                          <ClipboardListIcon className="w-3 h-3"/>
-                         Analyze Another
+                         Analyze New Document
                        </button>
                   </div>
-                  <div ref={documentContainerRef} className="p-4 text-sm text-muted-foreground overflow-y-auto font-mono whitespace-pre-wrap flex-1 pr-2">
+                  <div ref={documentContainerRef} className="p-4 text-sm text-muted-foreground overflow-y-auto font-mono whitespace-pre-wrap flex-1">
                       <HighlightableText text={contractText} highlight={highlightTarget} />
                   </div>
               </div>
-              <div className="overflow-y-auto pr-2">
+              <div className="overflow-y-auto pr-1">
                  {analysis.keyTakeaways.length > 0 && <SummaryHeader analysis={analysis} />}
                  <SummaryDisplay 
                     clauses={analysis.clauses} 
@@ -207,20 +207,20 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
           {step === 'input' && (
             <>
               <div className="w-full max-w-4xl text-center">
-                <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-violet-600 to-fuchsia-500">
+                <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-card-foreground font-serif">
                   Analyze Document
                 </h1>
                 <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
                   Paste any contract, policy, or legal text below. Our AI will give you a simple, plain-English summary.
                 </p>
-                <div className="mt-6 flex items-center justify-center space-x-2 text-sm text-green-600">
+                <div className="mt-6 flex items-center justify-center space-x-2 text-sm text-risk-low">
                   <LockIcon className="h-4 w-4" />
                   <span>Your document is securely processed and never stored. Ever.</span>
                 </div>
               </div>
               <div className="w-full max-w-4xl mt-8">
                 {inputError && (
-                    <div className="mb-4 text-center text-destructive-foreground bg-destructive/80 p-3 rounded-lg w-full max-w-4xl animate-fade-in text-sm">
+                    <div className="mb-4 text-center text-destructive-foreground bg-destructive/20 p-3 rounded-lg w-full max-w-4xl animate-fade-in text-sm border border-destructive/30">
                         <p>{inputError}</p>
                     </div>
                 )}
@@ -249,7 +249,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
         </motion.div>
       </AnimatePresence>
       {error && step !== 'processing' && !analysis && (
-        <div className="mt-8 text-center text-destructive-foreground bg-destructive/80 p-4 rounded-lg w-full max-w-4xl animate-fade-in">
+        <div className="mt-8 text-center text-destructive-foreground bg-destructive/20 p-4 rounded-lg w-full max-w-4xl animate-fade-in border border-destructive/30">
           <p>{error}</p>
         </div>
       )}

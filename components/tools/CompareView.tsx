@@ -64,16 +64,16 @@ const DocumentInput: React.FC<DocumentInputProps> = ({ title, value, onChange, o
                     value={value}
                     onChange={handleTextAreaChange}
                     placeholder={`Paste document text here...`}
-                    className="w-full h-full p-3 bg-white/20 border border-white/30 rounded-lg resize-none focus:ring-2 focus:ring-primary/50 transition"
+                    className="w-full h-full p-3 bg-card border border rounded-lg resize-none focus:ring-2 focus:ring-primary/50 transition"
                     disabled={disabled || isReadingFile}
                 />
                 {value && !disabled && (
-                    <button onClick={onClear} aria-label="Clear input" className="absolute top-2 right-2 p-1 rounded-full bg-black/10 hover:bg-black/20"><XIcon className="w-4 h-4" /></button>
+                    <button onClick={onClear} aria-label="Clear input" className="absolute top-2 right-2 p-1 rounded-full bg-muted/20 hover:bg-muted/30"><XIcon className="w-4 h-4" /></button>
                 )}
             </div>
             <div className="mt-3">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="text/*" />
-                <button onClick={() => fileInputRef.current?.click()} disabled={disabled || isReadingFile} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors bg-white/20 hover:bg-white/40 disabled:opacity-50 border border-white/20">
+                <button onClick={() => fileInputRef.current?.click()} disabled={disabled || isReadingFile} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors bg-card hover:bg-muted/20 disabled:opacity-50 border border">
                     <UploadIcon className="h-4 w-4" />
                     {isReadingFile ? 'Reading...' : 'Upload File'}
                 </button>
@@ -141,7 +141,7 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
                 className="w-full"
             >
                 <div className="w-full max-w-5xl text-center mx-auto">
-                    <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-violet-600 to-fuchsia-500">
+                    <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-card-foreground font-serif">
                       Compare Documents
                     </h1>
                     <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -150,7 +150,7 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
                 </div>
                 {initialDocument && (
                     <div className="text-center my-4">
-                        <button onClick={() => setDocA(initialDocument)} className="flex items-center gap-2 mx-auto px-4 py-2 text-sm font-medium rounded-full transition-colors bg-white/20 hover:bg-white/40 border border-white/20">
+                        <button onClick={() => setDocA(initialDocument)} className="flex items-center gap-2 mx-auto px-4 py-2 text-sm font-medium rounded-full transition-colors bg-card hover:bg-muted/20 border border">
                             <DocumentTextIcon className="w-4 h-4" /> Load current document into Document A
                         </button>
                     </div>
@@ -163,9 +163,9 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
                     <button
                         onClick={handleCompare}
                         disabled={isLoading || !docA.trim() || !docB.trim()}
-                        className="group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-white transition-all duration-300 disabled:opacity-50 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 shadow-lg shadow-primary/30"
+                        className="group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 disabled:opacity-50 bg-primary hover:bg-primary/80 shadow-lg shadow-primary/30"
                     >
-                      <span className="absolute h-0 w-0 rounded-full bg-purple-700 transition-all duration-500 ease-out group-hover:h-56 group-hover:w-56"></span>
+                      <span className="absolute h-0 w-0 rounded-full bg-white/20 transition-all duration-500 ease-out group-hover:h-56 group-hover:w-56"></span>
                       <span className="relative flex items-center gap-2">
                         <GitCompareArrowsIcon className="h-5 w-5" />
                         Compare

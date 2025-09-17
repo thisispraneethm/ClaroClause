@@ -18,26 +18,26 @@ interface ComparisonResultDisplayProps {
 const changeStyles = {
     [ChangeType.Added]: {
         icon: PlusCircleIcon,
-        borderColorClass: 'border-green-500',
-        textColorClass: 'text-green-500',
+        borderColorClass: 'border-risk-low',
+        textColorClass: 'text-risk-low',
         label: 'Added',
     },
     [ChangeType.Removed]: {
         icon: MinusCircleIcon,
-        borderColorClass: 'border-red-500',
-        textColorClass: 'text-red-500',
+        borderColorClass: 'border-risk-high',
+        textColorClass: 'text-risk-high',
         label: 'Removed',
     },
     [ChangeType.Modified]: {
         icon: PencilLineIcon,
-        borderColorClass: 'border-yellow-500',
-        textColorClass: 'text-yellow-500',
+        borderColorClass: 'border-risk-medium',
+        textColorClass: 'text-risk-medium',
         label: 'Modified',
     },
     [ChangeType.Unchanged]: {
         icon: InfoIcon,
-        borderColorClass: 'border-gray-400',
-        textColorClass: 'text-gray-400',
+        borderColorClass: 'border-border',
+        textColorClass: 'text-muted-foreground',
         label: 'Unchanged',
     },
 };
@@ -50,27 +50,27 @@ const ClauseComparisonCard: React.FC<{ clause: ComparedClause }> = ({ clause }) 
     const renderContent = () => {
         switch (clause.changeType) {
             case ChangeType.Added:
-                return <div className="p-4 bg-black/5 rounded-b-lg"><p className="whitespace-pre-wrap break-words">{clause.textB}</p></div>;
+                return <div className="p-4 bg-muted/10 rounded-b-lg"><p className="whitespace-pre-wrap break-words">{clause.textB}</p></div>;
             case ChangeType.Removed:
-                return <div className="p-4 bg-black/5 rounded-b-lg"><p className="whitespace-pre-wrap break-words">{clause.textA}</p></div>;
+                return <div className="p-4 bg-muted/10 rounded-b-lg"><p className="whitespace-pre-wrap break-words">{clause.textA}</p></div>;
             case ChangeType.Modified:
                 return (
-                    <div className="bg-black/5 rounded-b-lg p-4">
-                        <p className="italic text-sm text-muted-foreground mb-4 p-3 bg-white/10 rounded-md border border-white/10">{clause.summary}</p>
+                    <div className="bg-muted/10 rounded-b-lg p-4">
+                        <p className="italic text-sm text-muted-foreground mb-4 p-3 bg-card/50 rounded-md border border-border">{clause.summary}</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <h4 className="text-xs font-semibold uppercase tracking-wider text-red-400 mb-2">From Document A</h4>
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-risk-high mb-2">From Document A</h4>
                                 <p className="text-sm whitespace-pre-wrap break-words opacity-80">{clause.textA}</p>
                             </div>
                             <div>
-                                <h4 className="text-xs font-semibold uppercase tracking-wider text-green-400 mb-2">To Document B</h4>
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-risk-low mb-2">To Document B</h4>
                                 <p className="text-sm whitespace-pre-wrap break-words">{clause.textB}</p>
                             </div>
                         </div>
                     </div>
                 );
             case ChangeType.Unchanged:
-                return <div className="p-4 bg-black/5 rounded-b-lg"><p className="whitespace-pre-wrap break-words opacity-60">{clause.textA}</p></div>;
+                return <div className="p-4 bg-muted/10 rounded-b-lg"><p className="whitespace-pre-wrap break-words opacity-60">{clause.textA}</p></div>;
         }
     };
 
@@ -81,7 +81,7 @@ const ClauseComparisonCard: React.FC<{ clause: ComparedClause }> = ({ clause }) 
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4, ease: 'easeOut' }}
-            className={`glass-panel border-l-4 rounded-r-lg rounded-b-lg ${style.borderColorClass}`}
+            className={`glass-panel border-l-4 rounded-r-xl rounded-b-xl ${style.borderColorClass}`}
         >
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
@@ -91,7 +91,7 @@ const ClauseComparisonCard: React.FC<{ clause: ComparedClause }> = ({ clause }) 
             >
                 <div className="flex items-center gap-3">
                     <style.icon className={`w-5 h-5 ${style.textColorClass}`} />
-                    <span className="font-semibold">{style.label}</span>
+                    <span className="font-semibold truncate pr-4">{clause.changeType === ChangeType.Unchanged ? clause.textA.split('\n')[0].substring(0, 60)+'...' : style.label}</span>
                 </div>
                 <ChevronDownIcon className={`w-5 h-5 text-muted-foreground transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
             </button>
@@ -108,7 +108,7 @@ const ClauseComparisonCard: React.FC<{ clause: ComparedClause }> = ({ clause }) 
                             collapsed: { opacity: 0, height: 0 }
                         }}
                         transition={{ duration: 0.3, ease: 'easeInOut' }}
-                        className="overflow-hidden border-t border-white/10"
+                        className="overflow-hidden border-t border-border"
                     >
                         {renderContent()}
                     </motion.div>
@@ -138,10 +138,10 @@ export const ComparisonResultDisplay: React.FC<ComparisonResultDisplayProps> = (
             className="w-full max-w-4xl mx-auto"
         >
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Comparison Result</h1>
+                <h1 className="text-3xl font-bold font-serif">Comparison Result</h1>
                 <button
                     onClick={onReset}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full transition-colors bg-white/20 hover:bg-white/40 border border-white/20"
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full transition-colors bg-card/80 hover:bg-muted/20 border border-border"
                 >
                     <GitCompareArrowsIcon className="w-4 h-4" />
                     New Comparison
@@ -154,7 +154,7 @@ export const ComparisonResultDisplay: React.FC<ComparisonResultDisplayProps> = (
                 animate="visible"
                 className="glass-panel rounded-xl p-6 mb-8"
             >
-                <h2 className="text-xl font-bold mb-4">Summary of Changes</h2>
+                <h2 className="text-xl font-bold mb-4 font-serif">Summary of Changes</h2>
                 <div className="flex flex-col sm:flex-row items-center justify-around gap-4">
                     {summaryItems.map(item => {
                         const IconComponent = changeStyles[item.type].icon;
@@ -179,7 +179,7 @@ export const ComparisonResultDisplay: React.FC<ComparisonResultDisplayProps> = (
                 animate="visible"
                 className="space-y-4"
             >
-                <h2 className="text-2xl font-bold">Detailed Breakdown</h2>
+                <h2 className="text-2xl font-bold font-serif">Detailed Breakdown</h2>
                 {result.clauses.map((clause, index) => (
                     <ClauseComparisonCard key={index} clause={clause} />
                 ))}

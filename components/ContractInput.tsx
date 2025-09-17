@@ -72,13 +72,13 @@ export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, o
   const isDisabled = isLoading || isReadingFile;
 
   return (
-    <div className="bg-white/10 border border-white/20 rounded-2xl shadow-xl shadow-glass p-6 backdrop-blur-xl relative">
+    <div className="glass-panel p-6 rounded-3xl">
       <label htmlFor="contract-input" className="sr-only">Paste your contract, terms of service, or policy text here...</label>
       {hasValue && !isDisabled && (
         <button 
             onClick={onClear} 
             aria-label="Clear input"
-            className="absolute top-8 right-8 z-10 p-1.5 rounded-full bg-black/10 hover:bg-black/20 text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute top-8 right-8 z-10 p-1.5 rounded-full bg-card hover:bg-muted/20 text-muted-foreground hover:text-foreground transition-all duration-200"
         >
             <XIcon className="w-4 h-4" />
         </button>
@@ -88,7 +88,7 @@ export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, o
         value={value}
         onChange={handleInputChange}
         placeholder="Paste your contract, terms of service, or policy text here, or upload a file..."
-        className="w-full h-64 p-4 bg-white/20 border border-white/30 rounded-lg text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-300 resize-none shadow-glass"
+        className="w-full h-80 p-4 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner"
         disabled={isDisabled}
       />
       <div className="mt-6 flex justify-between items-center">
@@ -103,7 +103,7 @@ export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, o
             <button
                 onClick={handleUploadClick}
                 disabled={isDisabled}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors bg-white/20 text-secondary-foreground hover:bg-white/40 disabled:opacity-50 border border-white/20"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 bg-card/50 text-foreground hover:bg-muted/20 disabled:opacity-50 border border-border"
             >
                 <UploadIcon className="h-4 w-4" />
                 {isReadingFile ? 'Reading...' : 'Upload File'}
@@ -113,9 +113,9 @@ export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, o
         <button
           onClick={onDecode}
           disabled={isDisabled || !hasValue}
-          className={`group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-fuchsia-500 shadow-lg shadow-primary/30 ${hasValue && !isLoading ? 'animate-pulse-slow' : ''}`}
+          className={`group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring shadow-lg shadow-primary/30 ${hasValue && !isLoading ? 'animate-subtle-pulse' : ''}`}
         >
-          <span className="absolute h-0 w-0 rounded-full bg-purple-700 transition-all duration-500 ease-out group-hover:h-56 group-hover:w-56"></span>
+          <span className="absolute h-0 w-0 rounded-full bg-white/20 transition-all duration-500 ease-out group-hover:h-56 group-hover:w-56"></span>
           <span className="relative flex items-center gap-2">
             {isLoading ? 'Analyzing...' : 'Analyze Text'}
             {!isLoading && <SparklesIcon className="h-5 w-5" />}
