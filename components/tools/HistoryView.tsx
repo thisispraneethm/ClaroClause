@@ -32,6 +32,10 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
         { level: RiskLevel.Medium, color: 'bg-risk-medium' },
         { level: RiskLevel.Low, color: 'bg-risk-low' },
     ];
+    
+    const totalClauses = React.useMemo(() => {
+        return item.analysis.clauses.length;
+    }, [item.analysis.clauses]);
 
     return (
         <motion.div
@@ -40,9 +44,9 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
               hidden: { opacity: 0, y: 20 },
               visible: { opacity: 1, y: 0 },
             }}
-            whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
             exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-            className="glass-panel p-4 rounded-xl flex items-center justify-between transition-colors duration-200 hover:bg-muted/10"
+            className="glass-panel p-4 rounded-xl flex items-center justify-between transition-colors duration-200 hover:bg-white/5"
         >
             <div className="flex-1 overflow-hidden">
                 <h3 className="font-semibold truncate pr-2 text-card-foreground" title={item.documentTitle}>
@@ -51,20 +55,22 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
                 <p className="text-xs text-muted-foreground">
                     Analyzed on {formatDate(item.createdAt)}
                 </p>
-                <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-                    {riskItems.map(risk => (
-                        <div key={risk.level} className="flex items-center gap-1.5" title={`${riskCounts[risk.level] || 0} ${risk.level} risk clauses`}>
-                            <span className={`h-2 w-2 rounded-full ${risk.color}`}></span>
-                            <span>{riskCounts[risk.level] || 0}</span>
-                        </div>
-                    ))}
-                </div>
+                {totalClauses > 0 && (
+                  <div className="mt-3 w-full h-2 flex rounded-full overflow-hidden bg-secondary" title="Risk profile">
+                    {riskItems.map(risk => {
+                      const count = riskCounts[risk.level] || 0;
+                      if (count === 0) return null;
+                      const percentage = (count / totalClauses) * 100;
+                      return <div key={risk.level} className={`${risk.color}`} style={{ width: `${percentage}%` }} />;
+                    })}
+                  </div>
+                )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
                 <button 
                     onClick={onLoad}
                     title="Load Analysis"
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md text-muted-foreground bg-card/50 hover:bg-muted/20 hover:text-foreground transition-colors border border-border"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md text-muted-foreground bg-secondary/50 hover:bg-secondary hover:text-foreground transition-colors border border-border"
                 >
                     <ClipboardListIcon className="w-4 h-4" />
                     Load

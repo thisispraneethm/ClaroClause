@@ -19,13 +19,16 @@ interface SidebarProps {
 const Tooltip: React.FC<{ text: string; children: React.ReactElement; id: string }> = ({ text, children, id }) => {
     return (
         <div className="relative group flex items-center">
-            {/* FIX: The `aria-describedby` prop was passed as a string literal key, causing a TypeScript error.
-                Cloning the element and adding the prop directly resolves the issue. */}
-            {React.cloneElement(children, { "aria-describedby": id })}
+            {/*
+              FIX: The spread operator (`...`) on `children.props` can cause type errors in some TypeScript
+              configurations. Using `Object.assign` is a safer way to merge the existing props with the new
+              `aria-describedby` attribute, resolving the "Spread types may only be created from object types" error.
+            */}
+            {React.cloneElement(children, Object.assign({}, children.props, { 'aria-describedby': id }))}
             <div 
                 id={id}
                 role="tooltip"
-                className="absolute left-16 md:left-20 p-2 text-xs font-semibold text-foreground bg-card backdrop-blur-md border border-border rounded-md shadow-lg opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-300 whitespace-nowrap z-50 transform-gpu translate-x-[-4px] group-hover:translate-x-0"
+                className="absolute left-16 md:left-20 p-2 text-xs font-semibold text-foreground bg-background/80 backdrop-blur-md border border-border rounded-md shadow-lg opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-300 ease-in-out whitespace-nowrap z-50 transform-gpu translate-x-[-8px] scale-95 group-hover:translate-x-0 group-hover:scale-100"
             >
                 {text}
             </div>
@@ -47,15 +50,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTool, setActiveTool, isD
   const bottomNavItems: { id: string; icon: React.FC<any>; label: string; disabled: boolean }[] = [];
 
   return (
-    <aside className="w-16 md:w-20 bg-background/50 backdrop-blur-xl border-r border-border flex flex-col items-center justify-between py-5 px-2 shadow-glass z-10">
+    <aside className="w-16 md:w-20 bg-gradient-to-b from-card/10 to-card/20 backdrop-blur-xl border-r border-border flex flex-col items-center justify-between py-5 px-2 z-10">
       <div className="flex flex-col items-center gap-8">
         <motion.button 
-            whileHover={{ scale: 1.1, rotate: 5 }}
+            whileHover={{ scale: 1.1, rotate: 10 }}
             whileTap={{ scale: 0.95, rotate: -5 }}
             onClick={() => setActiveTool('home')} 
             aria-label="ClaroClause Home"
+            className="outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
         >
-          <SparklesIcon className="h-8 w-8 text-primary transition-transform duration-200" />
+          <SparklesIcon className="h-10 w-10 text-primary transition-transform duration-200" />
         </motion.button>
         <nav>
           <ul className="flex flex-col items-center gap-3">
@@ -72,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTool, setActiveTool, isD
                         w-12 h-12 flex items-center justify-center rounded-2xl transition-all duration-200 relative
                         ${activeTool === item.id 
                           ? 'text-primary' 
-                          : 'text-muted-foreground hover:bg-muted/10 hover:text-primary'}
+                          : 'text-muted-foreground hover:bg-secondary hover:text-primary'}
                         ${item.disabled 
                           ? 'opacity-30 cursor-not-allowed' 
                           : ''}
@@ -111,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTool, setActiveTool, isD
                         w-12 h-12 flex items-center justify-center rounded-2xl transition-all duration-200 relative
                         ${activeTool === item.id 
                           ? 'text-primary' 
-                          : 'text-muted-foreground hover:bg-muted/10 hover:text-primary'}
+                          : 'text-muted-foreground hover:bg-secondary/10 hover:text-primary'}
                         ${item.disabled 
                           ? 'opacity-30 cursor-not-allowed' 
                           : ''}

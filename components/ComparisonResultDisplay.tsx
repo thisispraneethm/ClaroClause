@@ -1,7 +1,7 @@
 import React from 'react';
 import type { ComparisonResult, ComparedClause } from '../types';
 import { ChangeType } from '../types';
-import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { motion, AnimatePresence, Variants, useSpring, useTransform } from 'framer-motion';
 import { InfoIcon } from './icons/InfoIcon';
 import { GitCompareArrowsIcon } from './icons/GitCompareArrowsIcon';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
@@ -13,6 +13,17 @@ import { ChevronDownIcon } from './icons/ChevronDownIcon';
 interface ComparisonResultDisplayProps {
   result: ComparisonResult;
   onReset: () => void;
+}
+
+const AnimatedNumber: React.FC<{ value: number }> = ({ value }) => {
+    const spring = useSpring(0, { stiffness: 100, damping: 30 });
+    const display = useTransform(spring, (current) => Math.round(current));
+
+    React.useEffect(() => {
+        spring.set(value);
+    }, [spring, value]);
+
+    return <motion.span>{display}</motion.span>;
 }
 
 const changeStyles = {
@@ -50,12 +61,12 @@ const ClauseComparisonCard: React.FC<{ clause: ComparedClause }> = ({ clause }) 
     const renderContent = () => {
         switch (clause.changeType) {
             case ChangeType.Added:
-                return <div className="p-4 bg-muted/10 rounded-b-lg"><p className="whitespace-pre-wrap break-words">{clause.textB}</p></div>;
+                return <div className="p-4 bg-background/50 rounded-b-lg"><p className="whitespace-pre-wrap break-words">{clause.textB}</p></div>;
             case ChangeType.Removed:
-                return <div className="p-4 bg-muted/10 rounded-b-lg"><p className="whitespace-pre-wrap break-words">{clause.textA}</p></div>;
+                return <div className="p-4 bg-background/50 rounded-b-lg"><p className="whitespace-pre-wrap break-words">{clause.textA}</p></div>;
             case ChangeType.Modified:
                 return (
-                    <div className="bg-muted/10 rounded-b-lg p-4">
+                    <div className="bg-background/50 rounded-b-lg p-4">
                         <p className="italic text-sm text-muted-foreground mb-4 p-3 bg-card/50 rounded-md border border-border">{clause.summary}</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -70,7 +81,7 @@ const ClauseComparisonCard: React.FC<{ clause: ComparedClause }> = ({ clause }) 
                     </div>
                 );
             case ChangeType.Unchanged:
-                return <div className="p-4 bg-muted/10 rounded-b-lg"><p className="whitespace-pre-wrap break-words opacity-60">{clause.textA}</p></div>;
+                return <div className="p-4 bg-background/50 rounded-b-lg"><p className="whitespace-pre-wrap break-words opacity-60">{clause.textA}</p></div>;
         }
     };
 
@@ -141,7 +152,7 @@ export const ComparisonResultDisplay: React.FC<ComparisonResultDisplayProps> = (
                 <h1 className="text-3xl font-bold font-serif">Comparison Result</h1>
                 <button
                     onClick={onReset}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full transition-colors bg-card/80 hover:bg-muted/20 border border-border"
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full transition-colors bg-secondary/50 hover:bg-secondary border border-border"
                 >
                     <GitCompareArrowsIcon className="w-4 h-4" />
                     New Comparison
@@ -165,7 +176,7 @@ export const ComparisonResultDisplay: React.FC<ComparisonResultDisplayProps> = (
                                 className="flex items-center gap-3 text-lg"
                             >
                                 <IconComponent className={`w-7 h-7 ${changeStyles[item.type].textColorClass}`} />
-                                <span className="font-bold text-2xl">{item.count}</span>
+                                <span className="font-bold text-2xl"><AnimatedNumber value={item.count} /></span>
                                 <span className="text-muted-foreground">{changeStyles[item.type].label}</span>
                             </motion.div>
                         );

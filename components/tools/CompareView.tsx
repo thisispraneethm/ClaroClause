@@ -64,16 +64,16 @@ const DocumentInput: React.FC<DocumentInputProps> = ({ title, value, onChange, o
                     value={value}
                     onChange={handleTextAreaChange}
                     placeholder={`Paste document text here...`}
-                    className="w-full h-full p-3 bg-card border border rounded-lg resize-none focus:ring-2 focus:ring-primary/50 transition"
+                    className="w-full h-full p-3 bg-background/50 border border-border rounded-lg resize-none focus:ring-2 focus:ring-primary/50 transition"
                     disabled={disabled || isReadingFile}
                 />
                 {value && !disabled && (
-                    <button onClick={onClear} aria-label="Clear input" className="absolute top-2 right-2 p-1 rounded-full bg-muted/20 hover:bg-muted/30"><XIcon className="w-4 h-4" /></button>
+                    <button onClick={onClear} aria-label="Clear input" className="absolute top-2 right-2 p-1 rounded-full bg-secondary/50 hover:bg-secondary"><XIcon className="w-4 h-4" /></button>
                 )}
             </div>
             <div className="mt-3">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="text/*" />
-                <button onClick={() => fileInputRef.current?.click()} disabled={disabled || isReadingFile} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors bg-card hover:bg-muted/20 disabled:opacity-50 border border">
+                <button onClick={() => fileInputRef.current?.click()} disabled={disabled || isReadingFile} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors bg-secondary/50 hover:bg-secondary disabled:opacity-50 border border-border">
                     <UploadIcon className="h-4 w-4" />
                     {isReadingFile ? 'Reading...' : 'Upload File'}
                 </button>
@@ -92,10 +92,20 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
     const [result, setResult] = React.useState<ComparisonResult | null>(null);
     const [isLoading, setIsLoading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
+    const isMounted = React.useRef(true);
 
     React.useEffect(() => {
         setDocA(initialDocument);
     }, [initialDocument]);
+    
+    // FIX: Use a ref to track mount status. This prevents state updates on unmounted
+    // components if the user navigates away during a long API call.
+    React.useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
 
     const handleCompare = async () => {
         if (!docA.trim() || !docB.trim()) {
@@ -107,12 +117,18 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
         setResult(null);
         try {
             const comparisonResult = await geminiService.compareDocuments(docA, docB);
-            setResult(comparisonResult);
+            if (isMounted.current) {
+                setResult(comparisonResult);
+            }
         } catch (err) {
             console.error(err);
-            setError(err instanceof Error ? err.message : 'Failed to compare the documents. Please try again.');
+            if (isMounted.current) {
+                setError(err instanceof Error ? err.message : 'Failed to compare the documents. Please try again.');
+            }
         } finally {
-            setIsLoading(false);
+            if (isMounted.current) {
+                setIsLoading(false);
+            }
         }
     };
     
@@ -120,8 +136,7 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
         setResult(null);
         setError(null);
         setIsLoading(false);
-        setDocA('');
-        setDocB('');
+        // Do not clear docA and docB to allow users to make edits and re-compare
     };
 
     const renderContent = () => {
@@ -150,7 +165,7 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
                 </div>
                 {initialDocument && (
                     <div className="text-center my-4">
-                        <button onClick={() => setDocA(initialDocument)} className="flex items-center gap-2 mx-auto px-4 py-2 text-sm font-medium rounded-full transition-colors bg-card hover:bg-muted/20 border border">
+                        <button onClick={() => setDocA(initialDocument)} className="flex items-center gap-2 mx-auto px-4 py-2 text-sm font-medium rounded-full transition-colors bg-secondary/50 hover:bg-secondary border border-border">
                             <DocumentTextIcon className="w-4 h-4" /> Load current document into Document A
                         </button>
                     </div>
@@ -165,7 +180,7 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
                         disabled={isLoading || !docA.trim() || !docB.trim()}
                         className="group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 disabled:opacity-50 bg-primary hover:bg-primary/80 shadow-lg shadow-primary/30"
                     >
-                      <span className="absolute h-0 w-0 rounded-full bg-white/20 transition-all duration-500 ease-out group-hover:h-56 group-hover:w-56"></span>
+                      <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shine" />
                       <span className="relative flex items-center gap-2">
                         <GitCompareArrowsIcon className="h-5 w-5" />
                         Compare
@@ -179,7 +194,7 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
     return (
         <div className="container mx-auto px-4 py-8 md:py-12 flex flex-col items-center justify-start min-h-full">
             <AnimatePresence mode="wait">
-                <div key={result ? 'result' : 'input'} className="w-full">
+                <div key={result ? 'result' : 'input'} className="w-full flex justify-center">
                     {renderContent()}
                 </div>
             </AnimatePresence>

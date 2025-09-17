@@ -49,7 +49,7 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ isOpen, onAcce
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-            className="glass-panel p-8 max-w-lg w-full relative rounded-2xl border-border"
+            className="glass-panel p-8 max-w-lg w-full relative rounded-2xl"
             onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
             role="dialog"
             aria-modal="true"

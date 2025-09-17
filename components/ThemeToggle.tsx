@@ -11,9 +11,9 @@ export const ThemeToggle: React.FC = () => {
     <motion.button
       onClick={toggleTheme}
       aria-label={theme === 'dark' ? 'Activate light mode' : 'Activate dark mode'}
-      whileHover={{ scale: 1.1 }}
-      whileTap={{ scale: 0.9 }}
-      className="relative w-12 h-12 flex items-center justify-center rounded-2xl transition-colors duration-200 text-gray-400 hover:bg-muted/20 hover:text-primary"
+      whileHover={{ scale: 1.1, rotate: 15 }}
+      whileTap={{ scale: 0.9, rotate: -15 }}
+      className="relative w-12 h-12 flex items-center justify-center rounded-full transition-colors duration-200 text-muted-foreground bg-secondary/50 hover:bg-secondary hover:text-primary"
     >
       <AnimatePresence initial={false} mode="wait">
         <motion.div

@@ -10,6 +10,17 @@ interface SummaryHeaderProps {
   analysis: ContractAnalysis;
 }
 
+const AnimatedNumber: React.FC<{ value: number }> = ({ value }) => {
+    const spring = useSpring(0, { stiffness: 100, damping: 30 });
+    const display = useTransform(spring, (current) => Math.round(current));
+
+    React.useEffect(() => {
+        spring.set(value);
+    }, [spring, value]);
+
+    return <motion.span>{display}</motion.span>;
+}
+
 const ScoreCircle: React.FC<{ score: number }> = ({ score }) => {
   const circumference = 2 * Math.PI * 46;
 
@@ -29,15 +40,12 @@ const ScoreCircle: React.FC<{ score: number }> = ({ score }) => {
   }
   
   const progressSpring = useSpring(0, { stiffness: 30, damping: 20, restDelta: 0.001 });
-  const scoreSpring = useSpring(0, { stiffness: 50, damping: 25, restDelta: 0.1 });
   
   React.useEffect(() => {
     progressSpring.set(score / 100);
-    scoreSpring.set(score);
-  }, [score, progressSpring, scoreSpring]);
+  }, [score, progressSpring]);
 
   const offset = useTransform(progressSpring, (p) => circumference - p * circumference);
-  const displayScore = useTransform(scoreSpring, (v) => Math.round(v));
   const uniqueGradientId = React.useId();
 
   return (
@@ -74,9 +82,9 @@ const ScoreCircle: React.FC<{ score: number }> = ({ score }) => {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span className={`text-4xl font-bold font-serif ${colorClass}`}>
-            {displayScore}
-        </motion.span>
+        <span className={`text-4xl font-bold font-serif ${colorClass}`}>
+            <AnimatedNumber value={score} />
+        </span>
         <span className="text-xs text-muted-foreground mt-1">Fairness Score</span>
       </div>
     </div>
@@ -93,8 +101,20 @@ export const SummaryHeader: React.FC<SummaryHeaderProps> = ({ analysis }) => {
     }, [analysis.clauses]);
     
     const [copyStatus, setCopyStatus] = React.useState<'Copy' | 'Copied!'>('Copy');
+    const copyTimeoutRef = React.useRef<number | null>(null);
+
+    React.useEffect(() => {
+        return () => {
+            if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current);
+            }
+        };
+    }, []);
 
     const handleCopySummary = () => {
+        if (copyTimeoutRef.current) {
+            clearTimeout(copyTimeoutRef.current);
+        }
         const summaryText = `
 Document: ${analysis.documentTitle}
 Contract Score: ${analysis.overallScore}/100
@@ -105,7 +125,7 @@ ${analysis.keyTakeaways.map(t => `- ${t}`).join('\n')}
 
         navigator.clipboard.writeText(summaryText).then(() => {
             setCopyStatus('Copied!');
-            setTimeout(() => setCopyStatus('Copy'), 2000);
+            copyTimeoutRef.current = window.setTimeout(() => setCopyStatus('Copy'), 2000);
         });
     };
 
@@ -129,7 +149,7 @@ ${analysis.keyTakeaways.map(t => `- ${t}`).join('\n')}
                         {riskItems.map(item => (
                             <div key={item.level} className="flex items-center gap-1.5" title={`${riskCounts[item.level] || 0} ${item.label} clauses`}>
                                 <span className={`h-2 w-2 rounded-full ${item.color}`}></span>
-                                <span>{riskCounts[item.level] || 0}</span>
+                                <span><AnimatedNumber value={riskCounts[item.level] || 0} /></span>
                             </div>
                         ))}
                     </div>
@@ -139,7 +159,7 @@ ${analysis.keyTakeaways.map(t => `- ${t}`).join('\n')}
                         <h2 className="text-2xl font-bold text-card-foreground font-serif">Key Takeaways</h2>
                         <button
                             onClick={handleCopySummary}
-                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground hover:bg-muted/20 hover:text-foreground transition-all duration-200"
+                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground bg-secondary/50 hover:bg-secondary hover:text-foreground transition-all duration-200"
                         >
                             {copyStatus === 'Copied!' ? <CheckCircleIcon className="w-3.5 h-3.5 text-risk-low" /> : <CopyIcon className="w-3.5 h-3.5" />}
                             <span>{copyStatus} Summary</span>

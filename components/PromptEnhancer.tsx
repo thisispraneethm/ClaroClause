@@ -56,11 +56,11 @@ export const PromptEnhancer: React.FC<PromptEnhancerProps> = ({ onAnalyze, onBac
                                 />
                                 <label
                                     htmlFor={p.id}
-                                    className={`flex flex-col p-4 border rounded-xl cursor-pointer transition-all duration-200 ${options.persona === p.id ? 'bg-primary/20 border-primary/50 ring-2 ring-primary' : 'bg-card border hover:border-muted hover:bg-muted/10'}`}
+                                    className={`flex flex-col p-4 border rounded-xl cursor-pointer transition-all duration-200 ${options.persona === p.id ? 'bg-primary/20 border-primary/50 shadow-primary-glow' : 'bg-background/50 border-border hover:border-muted hover:bg-white/5'}`}
                                 >
                                     <span className="font-semibold">{p.name}</span>
                                     <span className="text-xs text-muted-foreground mt-1">{p.description}</span>
-                                </label>
+                                 </label>
                             </div>
                         ))}
                     </div>
@@ -75,7 +75,7 @@ export const PromptEnhancer: React.FC<PromptEnhancerProps> = ({ onAnalyze, onBac
                         value={options.focus}
                         onChange={handleFocusChange}
                         placeholder="e.g., termination clauses, liability limitations, data privacy..."
-                        className="w-full h-24 p-4 bg-card border border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner"
+                        className="w-full h-24 p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner"
                     />
                 </div>
             </div>
@@ -83,7 +83,7 @@ export const PromptEnhancer: React.FC<PromptEnhancerProps> = ({ onAnalyze, onBac
             <div className="mt-8 flex items-center justify-between">
                 <button
                     onClick={onBack}
-                    className="inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-medium rounded-full transition-colors bg-card text-foreground hover:bg-muted/20 border border"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-medium rounded-full transition-colors bg-secondary/50 text-foreground hover:bg-secondary border border-border"
                 >
                     <ArrowLeftIcon className="h-4 w-4"/>
                     Back
@@ -92,7 +92,7 @@ export const PromptEnhancer: React.FC<PromptEnhancerProps> = ({ onAnalyze, onBac
                     onClick={handleSubmit}
                     className={`group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 bg-primary hover:bg-primary/80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring shadow-lg shadow-primary/20 animate-subtle-pulse`}
                 >
-                    <span className="absolute h-0 w-0 rounded-full bg-white/20 transition-all duration-500 ease-out group-hover:h-56 group-hover:w-56"></span>
+                    <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shine" />
                     <span className="relative flex items-center gap-2">
                         Start Analysis
                         <SparklesIcon className="h-5 w-5" />

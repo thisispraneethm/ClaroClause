@@ -40,19 +40,24 @@ export const Loader: React.FC<LoaderProps> = ({ progress }) => {
           enhancing the user's understanding of the current action.
         */}
         <div className="relative w-20 h-20">
-            <DocumentTextIcon className="w-full h-full text-muted-foreground/50" />
+            <DocumentTextIcon className="w-full h-full text-muted-foreground/30" />
             <motion.div
                 className="absolute top-0 left-0 w-full h-full flex items-center justify-center"
                 animate={{
-                    y: [-12, 12, -12],
+                    y: [-16, 16, -16],
                 }}
                 transition={{
-                    duration: 2.5,
+                    duration: 4,
                     ease: "easeInOut",
                     repeat: Infinity,
                 }}
             >
-                <SearchCodeIcon className="w-10 h-10 text-primary" />
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 4, ease: 'linear', repeat: Infinity}}
+                >
+                  <SearchCodeIcon className="w-10 h-10 text-primary" />
+                </motion.div>
             </motion.div>
         </div>
 
@@ -62,7 +67,7 @@ export const Loader: React.FC<LoaderProps> = ({ progress }) => {
       </div>
 
       {progress && (
-        <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden shadow-inner">
+        <div className="w-full bg-secondary/50 rounded-full h-2.5 overflow-hidden shadow-inner">
             <motion.div 
                 className="bg-primary h-2.5 rounded-full" 
                 initial={{ width: '0%' }}

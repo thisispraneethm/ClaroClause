@@ -20,17 +20,36 @@ const riskStyles: { [key in RiskLevel]: { textColorClass: string; borderColorCla
 const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string | null, occurrence: number | null) => void; }> = ({ clause, onHover }) => {
   const [isOriginalVisible, setIsOriginalVisible] = React.useState(false);
   const [copyStatus, setCopyStatus] = React.useState<'Copy' | 'Copied!' | 'Failed!'>('Copy');
+  // FIX: A ref to hold the timer ID. This prevents memory leaks by allowing
+  // the timeout to be cleared if the component unmounts before it fires.
+  const copyTimeoutRef = React.useRef<number | null>(null);
+
+  // FIX: The cleanup function returned by useEffect will now clear any pending
+  // timeouts, preventing state updates on an unmounted component.
+  React.useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
+
 
   const handleToggleOriginal = () => setIsOriginalVisible(!isOriginalVisible);
 
   const handleCopy = () => {
+    // FIX: Clear any existing timeout before setting a new one.
+    if (copyTimeoutRef.current) {
+      clearTimeout(copyTimeoutRef.current);
+    }
     navigator.clipboard.writeText(clause.originalClause).then(() => {
         setCopyStatus('Copied!');
-        setTimeout(() => setCopyStatus('Copy'), 2000);
+        // FIX: Store the new timeout ID in the ref.
+        copyTimeoutRef.current = window.setTimeout(() => setCopyStatus('Copy'), 2000);
     }).catch(err => {
         console.error('Failed to copy text: ', err);
         setCopyStatus('Failed!');
-        setTimeout(() => setCopyStatus('Copy'), 2000);
+        copyTimeoutRef.current = window.setTimeout(() => setCopyStatus('Copy'), 2000);
     });
   };
 
@@ -46,9 +65,10 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, transition: { duration: 0.2 } }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
+      whileHover={{ y: -4, boxShadow: '0px 8px 40px -8px rgba(var(--primary-rgb), 0.2)' }}
     >
       <div
-        className={`glass-panel border-l-4 ${riskStyle.borderColorClass} rounded-r-xl rounded-b-xl backdrop-blur-sm transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 ${highRiskGlow} overflow-hidden`}
+        className={`glass-panel border-l-4 ${riskStyle.borderColorClass} rounded-r-xl rounded-b-xl backdrop-blur-sm transition-shadow duration-300 ${highRiskGlow} overflow-hidden`}
       >
         <div className="p-5">
           <div className="flex justify-between items-start gap-4">
@@ -57,7 +77,7 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
                {clause.confidence === 'Low' && (
                  <div className="relative group">
                   <HelpCircleIcon className="h-4 w-4 text-risk-medium" />
-                  <span className="absolute bottom-full mb-2 w-48 left-1/2 -translate-x-1/2 p-2 text-xs font-semibold text-primary-foreground bg-slate-800/80 backdrop-blur-sm border border rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                  <span className="absolute bottom-full mb-2 w-48 left-1/2 -translate-x-1/2 p-2 text-xs font-semibold text-primary-foreground bg-slate-800/80 backdrop-blur-sm border border-border rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
                       AI confidence is low. The original text may be ambiguous or complex.
                   </span>
                  </div>
@@ -68,7 +88,7 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
                   Good to Know
                 </span>
               )}
-              <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${riskStyle.textColorClass} bg-muted/20`}>
+              <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${riskStyle.textColorClass} bg-background`}>
                 {clause.risk} Risk
               </span>
             </div>
@@ -76,7 +96,7 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
           <p className="mt-3 text-muted-foreground leading-relaxed">{clause.explanation}</p>
         </div>
         
-        <div className="mt-2 border-t border px-5 py-3 flex items-center justify-start gap-4 text-sm">
+        <div className="border-t border-border/50 bg-white/5 px-5 py-3 flex items-center justify-start gap-4 text-sm">
           <button onClick={handleToggleOriginal} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200">
             <DocumentTextIcon className="h-4 w-4" />
             <span>Original Text</span>
@@ -93,12 +113,12 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
               transition={{ duration: 0.3, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              <div className="bg-muted/10 p-4 border-t border">
+              <div className="bg-background/50 p-4 border-t border-border/50">
                   <div className="flex justify-between items-center mb-2">
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Original Clause</h4>
                       <button 
                           onClick={handleCopy}
-                          className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md text-muted-foreground hover:bg-card hover:text-foreground transition-all duration-200"
+                          className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md text-muted-foreground bg-secondary/50 hover:bg-secondary hover:text-foreground transition-all duration-200"
                       >
                           {copyStatus === 'Copied!' ? <CheckCircleIcon className="w-3.5 h-3.5 text-risk-low" /> : <CopyIcon className="w-3.5 h-3.5" />}
                           <span>{copyStatus}</span>
@@ -126,14 +146,14 @@ const RiskGroupAccordion: React.FC<{ level: RiskLevel, clauses: DecodedClause[],
         <motion.div layout className="glass-panel rounded-xl overflow-hidden">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`w-full flex items-center justify-between p-4 text-left transition-colors duration-200 hover:bg-muted/10 border-l-4 ${riskStyle.borderColorClass}`}
+                className={`w-full flex items-center justify-between p-4 text-left transition-colors duration-200 hover:bg-white/5 border-l-4 ${riskStyle.borderColorClass}`}
                 aria-expanded={isOpen}
                 aria-controls={contentId}
             >
                 <div className="flex items-center gap-3">
                     <IconComponent className={`w-5 h-5 ${riskStyle.textColorClass}`} />
                     <span className="font-semibold text-card-foreground">{level} Risk</span>
-                    <span className="px-2.5 py-0.5 text-xs font-semibold text-muted-foreground bg-muted/20 rounded-full">{clauses.length}</span>
+                    <span className="px-2.5 py-0.5 text-xs font-semibold text-muted-foreground bg-background/50 rounded-full">{clauses.length}</span>
                 </div>
                 <ChevronDownIcon className={`w-5 h-5 text-muted-foreground transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -153,7 +173,7 @@ const RiskGroupAccordion: React.FC<{ level: RiskLevel, clauses: DecodedClause[],
                         transition={{ duration: 0.4, ease: [0.04, 0.62, 0.23, 0.98] }}
                         className="overflow-hidden"
                     >
-                        <div className={`p-4 space-y-4 border-t border`}>
+                        <div className={`p-4 space-y-4 border-t border-border/50`}>
                             <AnimatePresence>
                                 {clauses.map((clause, index) => (
                                     <ClauseCard key={`${index}-${clause.title}`} clause={clause} onHover={onClauseHover} />

@@ -1,33 +1,61 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { SparklesIcon } from '../icons/SparklesIcon';
+import { geminiService } from '../../services/geminiService';
+import { PencilIcon } from '../icons/PencilIcon';
 import { CopyIcon } from '../icons/CopyIcon';
 import { CheckCircleIcon } from '../icons/CheckCircleIcon';
-import { PencilIcon } from '../icons/PencilIcon';
 
-interface DraftViewProps {
-  onDraft: (prompt: string) => void;
-  isDrafting: boolean;
-  draftResult: string;
-  setDraftResult: (result: string) => void;
-  error: string | null;
-}
-
-export const DraftView: React.FC<DraftViewProps> = ({ onDraft, isDrafting, draftResult, setDraftResult, error }) => {
+export const DraftView: React.FC = () => {
   const [prompt, setPrompt] = React.useState('');
+  const [result, setResult] = React.useState('');
+  const [isDrafting, setIsDrafting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  
   const [copyStatus, setCopyStatus] = React.useState<'Copy' | 'Copied!'>('Copy');
   const resultTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const copyTimeoutRef = React.useRef<number | null>(null);
 
-  const handleDraft = () => {
-    if (prompt.trim()) {
-      onDraft(prompt);
+  React.useEffect(() => {
+    return () => {
+        if (copyTimeoutRef.current) {
+            clearTimeout(copyTimeoutRef.current);
+        }
+    };
+  }, []);
+
+  const handleDraft = async () => {
+    if (!prompt.trim()) return;
+
+    setIsDrafting(true);
+    setError(null);
+    setResult('');
+    
+    try {
+      let fullResponse = '';
+      for await (const chunk of geminiService.draftDocumentStream(prompt)) {
+        fullResponse += chunk;
+        setResult(fullResponse);
+      }
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+         console.log("Draft stream was cancelled.");
+         setError("Drafting was cancelled.");
+         return;
+      }
+      const message = e instanceof Error ? e.message : 'An unknown error occurred while drafting.';
+      setError(message);
+    } finally {
+        setIsDrafting(false);
     }
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(draftResult).then(() => {
+    if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+    }
+    navigator.clipboard.writeText(result).then(() => {
       setCopyStatus('Copied!');
-      setTimeout(() => setCopyStatus('Copy'), 2000);
+      copyTimeoutRef.current = window.setTimeout(() => setCopyStatus('Copy'), 2000);
     }).catch(err => {
       console.error('Failed to copy text: ', err);
     });
@@ -40,9 +68,9 @@ export const DraftView: React.FC<DraftViewProps> = ({ onDraft, isDrafting, draft
         textarea.style.height = 'auto';
         textarea.style.height = `${textarea.scrollHeight}px`;
     }
-  }, [draftResult]);
+  }, [result]);
 
-  const hasResult = draftResult.trim().length > 0;
+  const hasResult = result.trim().length > 0;
 
   return (
     <div className="container mx-auto px-4 py-8 md:py-12 flex flex-col items-center justify-start min-h-full">
@@ -61,7 +89,7 @@ export const DraftView: React.FC<DraftViewProps> = ({ onDraft, isDrafting, draft
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="e.g., a simple non-disclosure agreement for a freelance project..."
-            className="w-full h-32 p-4 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner"
+            className="w-full h-32 p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner"
             disabled={isDrafting}
           />
           <div className="mt-6 flex justify-end">
@@ -70,7 +98,7 @@ export const DraftView: React.FC<DraftViewProps> = ({ onDraft, isDrafting, draft
               disabled={isDrafting || !prompt.trim()}
               className="group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring shadow-lg shadow-primary/30"
             >
-              <span className="absolute h-0 w-0 rounded-full bg-white/20 transition-all duration-500 ease-out group-hover:h-56 group-hover:w-56"></span>
+              <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shine" />
               <span className="relative flex items-center gap-2">
                 {isDrafting ? 'Generating...' : 'Generate Draft'}
                 {!isDrafting && <PencilIcon className="h-5 w-5" />}
@@ -99,21 +127,21 @@ export const DraftView: React.FC<DraftViewProps> = ({ onDraft, isDrafting, draft
               {hasResult && (
                 <button
                   onClick={handleCopy}
-                  className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground hover:bg-muted/20 hover:text-foreground transition-all duration-200"
+                  className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground bg-secondary/50 hover:bg-secondary hover:text-foreground transition-all duration-200"
                 >
                   {copyStatus === 'Copied!' ? <CheckCircleIcon className="w-3.5 h-3.5 text-risk-low" /> : <CopyIcon className="w-3.5 h-3.5" />}
                   <span>{copyStatus}</span>
                 </button>
               )}
             </div>
-             <textarea
-                ref={resultTextareaRef}
-                value={draftResult}
-                onChange={(e) => setDraftResult(e.target.value)}
-                readOnly={isDrafting}
-                placeholder={isDrafting ? "AI is generating your document..." : "Generated document will appear here."}
-                className="w-full min-h-[250px] p-4 bg-card/50 border-none rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary transition-all duration-300 resize-y shadow-inner"
-             />
+            <textarea
+              ref={resultTextareaRef}
+              value={result}
+              onChange={(e) => setResult(e.target.value)}
+              readOnly={isDrafting}
+              placeholder={isDrafting ? "AI is generating your document..." : "Generated document will appear here."}
+              className={`w-full min-h-[250px] p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary transition-all duration-300 resize-y shadow-inner ${isDrafting ? 'is-drafting' : ''}`}
+            />
           </div>
         </motion.div>
       )}

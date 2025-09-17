@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF--8" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#ffffff" />
@@ -16,51 +16,56 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       :root {
-        /* Base (Dark Theme) Variables - Refined for a more premium feel */
-        --background-start-rgb: 10 10 15;
-        --background-end-rgb: 23 23 30;
-        --foreground-rgb: 225 225, 230;
+        --background-rgb: 10 10 15;
+        --foreground-rgb: 235 235 240;
+        --shadow-color-rgb: 0 0 0;
 
-        --card-rgb: 255 255 255;
-        --card-foreground-rgb: 248 250 252;
+        --card-rgb: 24 24 30;
+        --card-foreground-rgb: 235 235 240;
 
-        --primary: 167 139 250; /* A slightly softer, more vibrant violet */
-        --primary-foreground: 10 10 15;
+        --primary-rgb: 173 150 255; 
+        --primary-foreground-rgb: 10 10 15;
 
-        --muted-rgb: 100 116 139;
+        --secondary-rgb: 40 42 54;
+        --secondary-foreground-rgb: 235 235 240;
+        
+        --muted-rgb: 156 163 175;
         --muted-foreground-rgb: 156 163 175;
         
-        --border-rgb: 255 255 255;
-        --ring: 167 139 250;
+        --border-rgb: 50 52 64;
+        --ring-rgb: 173 150 255;
 
-        --risk-high-rgb: 248 113 113;
-        --risk-medium-rgb: 251 191 36; /* Amber-400 for better vibrancy */
-        --risk-low-rgb: 52 211 153; /* Emerald-400 for a fresher green */
+        --risk-high-rgb: 250 100 100;
+        --risk-medium-rgb: 251 191 36;
+        --risk-low-rgb: 52 211 153; 
 
         --destructive-rgb: 220 38 38;
         --destructive-foreground-rgb: 248 250 252;
       }
       
       html[data-theme='light'] {
-        --background-start-rgb: 247 247 248; /* Off-white for a softer look */
-        --background-end-rgb: 238 239 242;
-        --foreground-rgb: 31 41 55; /* Slate-800 for stronger text contrast */
+        --background-rgb: 248 249 252;
+        --foreground-rgb: 20 20 30;
+        --shadow-color-rgb: 100 100 120;
+
+        --card-rgb: 255 255 255;
+        --card-foreground-rgb: 20 20 30;
         
-        --card-rgb: 0 0 0;
-        --card-foreground-rgb: 17 24 39;
-        
-        --primary: 99 102 241;
-        --primary-foreground: 255 255 255;
+        --primary-rgb: 99 102 241;
+        --primary-foreground-rgb: 255 255 255;
+
+        --secondary-rgb: 238 242 255;
+        --secondary-foreground-rgb: 20 20 30;
         
         --muted-rgb: 148 163 184;
         --muted-foreground-rgb: 100 116 139;
         
-        --border-rgb: 0 0 0;
-        --ring: 99 102 241;
+        --border-rgb: 226 232 240;
+        --ring-rgb: 99 102 241;
 
         --risk-high-rgb: 239 68 68;
         --risk-medium-rgb: 245 158 11;
-        --risk-low-rgb: 22 163 74; /* A stronger green for light mode */
+        --risk-low-rgb: 22 163 74;
         
         --destructive-rgb: 239 68 68;
         --destructive-foreground-rgb: 248 250 252;
@@ -68,42 +73,88 @@
       
       html, body, #root {
         height: 100%;
-        overflow: hidden;
       }
 
       body {
         color: rgb(var(--foreground-rgb));
-        background-color: rgb(var(--background-start-rgb));
-        overflow: hidden;
+        background-color: rgb(var(--background-rgb));
         font-size: clamp(14px, 1vw, 16px);
         line-height: 1.6;
         transition: background-color 0.3s ease, color 0.3s ease;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+        overflow: hidden;
       }
       
-      /* Subtle, layered background for a premium feel */
+      /* --- START: NEW AURORA NEBULA BACKGROUND --- */
+      @keyframes aurora-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      @keyframes aurora-flow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
       body::before {
         content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: linear-gradient(175deg, rgba(var(--primary), 0.05) 0%, rgba(126, 34, 206, 0.0) 70%);
-        background-size: 150% 150%;
-        animation: aurora-bg 45s ease infinite;
+        position: fixed;
+        inset: -20px;
         z-index: -2;
-        will-change: background-position;
-      }
-      body::after {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background-image: radial-gradient(rgba(var(--border-rgb), 0.05) 1px, transparent 1px);
-        background-size: 24px 24px;
-        z-index: -1;
-        opacity: 0.5;
+        pointer-events: none;
+        
+        background-image:
+          /* Layer 1: Slow, spinning, large-scale conic gradients for aurora bands */
+          conic-gradient(from 120deg at 60% 50%, rgba(var(--primary-rgb), 0.25), transparent 30%),
+          conic-gradient(from 300deg at 40% 50%, rgba(var(--risk-low-rgb), 0.2), transparent 30%),
+          
+          /* Layer 2: Soft, flowing radial gradients for cloud-like depth */
+          radial-gradient(ellipse at 20% 80%, rgba(var(--risk-medium-rgb), 0.25), transparent 40%),
+          radial-gradient(ellipse at 80% 30%, rgba(var(--primary-rgb), 0.2), transparent 40%);
+        
+        /* Different animations for a parallax effect */
+        animation: 
+          aurora-spin 80s linear infinite,
+          aurora-flow 40s ease-in-out infinite alternate;
+        
+        /* Multiple background properties for each layer */
+        background-size: 200% 200%, 200% 200%, 300% 300%, 300% 300%;
+        background-position: 0% 0%, 0% 0%, 0% 0%, 0% 0%;
+
+        filter: blur(100px) saturate(120%);
+        opacity: 0.8;
+        transform-origin: center;
+        will-change: transform, background-position;
       }
       
-      /* Refined scrollbar styling */
+      html[data-theme='light'] body::before {
+        opacity: 0.6;
+        filter: blur(100px) saturate(150%);
+        background-image:
+          conic-gradient(from 120deg at 60% 50%, rgba(var(--primary-rgb), 0.15), transparent 30%),
+          conic-gradient(from 300deg at 40% 50%, rgba(255, 150, 200, 0.15), transparent 30%),
+          radial-gradient(ellipse at 20% 80%, rgba(var(--risk-medium-rgb), 0.15), transparent 40%),
+          radial-gradient(ellipse at 80% 30%, rgba(var(--primary-rgb), 0.1), transparent 40%);
+      }
+      /* --- END: NEW AURORA NEBULA BACKGROUND --- */
+      
+      body::after {
+        content: '';
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        /* More subtle grid */
+        background-image: radial-gradient(rgba(var(--border-rgb), 0.5) 0.5px, transparent 0.5px);
+        background-size: 32px 32px;
+        z-index: -1;
+        opacity: 0.03;
+        mask-image: radial-gradient(ellipse at center, black 15%, transparent 75%);
+      }
+      
+      html[data-theme='light'] body::after {
+        opacity: 0.05;
+      }
+      
       ::-webkit-scrollbar {
         width: 10px;
         height: 10px;
@@ -112,40 +163,88 @@
         background-color: transparent;
       }
       ::-webkit-scrollbar-thumb {
-        background-color: rgba(var(--border-rgb), 0.1);
+        background-color: rgba(var(--border-rgb), 0.5);
         border-radius: 10px;
         border: 2px solid transparent;
         background-clip: content-box;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background-color: rgba(var(--border-rgb), 0.2);
+        background-color: rgba(var(--border-rgb), 0.8);
       }
       
-      /* Refined glass panel for a more subtle effect */
       .glass-panel {
-        background-color: rgba(var(--card-rgb), 0.03);
-        backdrop-filter: blur(40px);
-        border: 1px solid rgba(var(--border-rgb), 0.06);
-        box-shadow: 
-          0 10px 30px rgba(0,0,0,0.1);
-        position: relative;
-        transition: background-color 0.3s ease, border-color 0.3s ease;
+          backdrop-filter: blur(32px) saturate(180%);
+          -webkit-backdrop-filter: blur(32px) saturate(180%);
+          position: relative;
+          transition: background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+          z-index: 1; /* Ensure panel is above background effects */
       }
-      
+
+      html[data-theme='dark'] .glass-panel {
+          background-color: rgba(var(--card-rgb), 0.5);
+          background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+          border: 1px solid rgba(var(--foreground-rgb), 0.1);
+          box-shadow: 
+              inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.05),
+              0 10px 40px -10px rgba(var(--shadow-color-rgb), 0.4);
+      }
+
       html[data-theme='light'] .glass-panel {
-        background-color: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(24px);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
-        border: 1px solid rgba(0, 0, 0, 0.05);
+          background-color: rgba(var(--card-rgb), 0.7);
+          background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.7), transparent);
+          border: 1px solid rgba(var(--border-rgb), 0.7);
+          box-shadow: 
+              inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.5),
+              0 10px 40px -15px rgba(var(--shadow-color-rgb), 0.2);
       }
       
       mark {
-        background-color: rgba(var(--primary), 0.3);
-        color: rgb(var(--card-foreground-rgb));
-        padding: 0.2em 0.4em;
-        border-radius: 6px;
+        background-color: rgba(var(--primary-rgb), 0.25);
+        color: inherit;
+        padding: 0.1em 0.3em;
+        border-radius: 4px;
         transition: background-color 0.3s ease, color 0.3s ease;
-        box-shadow: 0 0 15px rgba(var(--primary), 0.2);
+        box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.3);
+      }
+      
+      @keyframes drafting-pulse {
+        0%, 100% { 
+            background-color: rgba(var(--primary-rgb), 0.03);
+            box-shadow: inset 0 0 0px 0px rgba(var(--primary-rgb), 0.1);
+        }
+        50% { 
+            background-color: rgba(var(--primary-rgb), 0.08); 
+            box-shadow: inset 0 0 10px 2px rgba(var(--primary-rgb), 0.2);
+        }
+      }
+      .is-drafting {
+          animation: drafting-pulse 2.5s infinite ease-in-out;
+      }
+
+      @keyframes animated-gradient-border {
+        0% { background-position: 0% 50% }
+        50% { background-position: 100% 50% }
+        100% { background-position: 0% 50% }
+      }
+
+      .feature-card {
+        position: relative;
+        z-index: 1;
+      }
+      .feature-card::after {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        inset: -1.5px;
+        border-radius: inherit;
+        background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.8), rgba(var(--risk-medium-rgb), 0.6), rgba(var(--primary-rgb), 0.8));
+        background-size: 300% 300%;
+        animation: animated-gradient-border 6s ease infinite;
+        opacity: 0;
+        transition: opacity 0.4s ease-out;
+      }
+      .feature-card:hover::after {
+        opacity: 1;
       }
     </style>
     <script>
@@ -153,14 +252,14 @@
         theme: {
           extend: {
             colors: {
-              border: 'rgba(var(--border-rgb), 0.1)',
+              border: 'rgba(var(--border-rgb))',
               input: 'rgba(var(--input-rgb), 0.05)',
-              ring: 'rgb(var(--ring))',
-              background: 'rgb(var(--background-start-rgb))',
+              ring: 'rgb(var(--ring-rgb))',
+              background: 'rgb(var(--background-rgb))',
               foreground: 'rgb(var(--foreground-rgb))',
               primary: {
-                DEFAULT: 'rgb(var(--primary))',
-                foreground: 'rgb(var(--primary-foreground))',
+                DEFAULT: 'rgb(var(--primary-rgb))',
+                foreground: 'rgb(var(--primary-foreground-rgb))',
               },
               secondary: {
                 DEFAULT: 'rgb(var(--secondary-rgb))',
@@ -175,7 +274,7 @@
                 foreground: 'rgb(var(--muted-foreground-rgb))',
               },
               card: {
-                DEFAULT: 'rgba(var(--card-rgb), 0.05)',
+                DEFAULT: 'rgb(var(--card-rgb))',
                 foreground: 'rgb(var(--card-foreground-rgb))',
               },
               risk: {
@@ -189,7 +288,8 @@
               serif: ['Lora', 'serif'],
             },
             animation: {
-              'aurora-bg': 'aurora-bg 45s ease infinite',
+              'enter': 'enter 0.5s ease-out forwards',
+              'shine': 'shine 4s linear infinite',
               'fade-in': 'fade-in 0.5s ease-out forwards',
               'slide-up': 'slide-up 0.5s ease-out forwards',
               'scale-in': 'scale-in 0.3s ease-out forwards',
@@ -197,9 +297,13 @@
               'flow': 'flow 2s infinite ease-in-out',
             },
             keyframes: {
-              'aurora-bg': {
-                '0%, 100%': { backgroundPosition: '0% 50%' },
-                '50%': { backgroundPosition: '100% 50%' },
+              'enter': {
+                  '0%': { opacity: '0', transform: 'translateY(10px)' },
+                  '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              'shine': {
+                  'from': { backgroundPosition: '200% 0' },
+                  'to': { backgroundPosition: '-200% 0' },
               },
               'fade-in': {
                 '0%': { opacity: '0' },
@@ -214,8 +318,8 @@
                   '100%': { transform: 'scale(1)', opacity: '1' },
               },
               'subtle-pulse': {
-                '0%, 100%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(var(--primary), 0.2)' },
-                '50%': { transform: 'scale(1.03)', boxShadow: '0 0 40px 15px rgba(var(--primary), 0)' }
+                '0%, 100%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(var(--primary-rgb), 0.2)' },
+                '50%': { transform: 'scale(1.02)', boxShadow: '0 0 40px 15px rgba(var(--primary-rgb), 0)' }
               },
               'flow': {
                   '0%': { transform: 'translateX(-100%)' },
@@ -224,6 +328,7 @@
             },
             boxShadow: {
                'glass': 'inset 0 1px 1px 0 rgba(var(--border-rgb), 0.05)',
+               'primary-glow': '0 0 20px rgba(var(--primary-rgb), 0.3)',
             }
           },
         },

@@ -23,6 +23,8 @@ interface AnalyzeViewProps {
   progress: { current: number; total: number } | null;
   analysisOptions: AnalysisOptions | null;
   citedClause: { text: string; occurrence: number } | null;
+  onSetError: (message: string) => void;
+  onClearError: () => void;
 }
 
 type AnalysisStep = 'input' | 'enhance' | 'processing';
@@ -81,14 +83,12 @@ const HighlightableText: React.FC<{ text: string, highlight: { text: string; occ
 });
 
 
-export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, contractText, setContractText, isLoading, error, onStartNew, progress, analysisOptions, citedClause }) => {
+export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, contractText, setContractText, isLoading, error, onStartNew, progress, analysisOptions, citedClause, onSetError, onClearError }) => {
   const [step, setStep] = React.useState<AnalysisStep>('input');
   const [hoveredClause, setHoveredClause] = React.useState<{ text: string | null, occurrence: number | null }>({ text: null, occurrence: null });
   const debouncedHoveredClause = useDebounce(hoveredClause, 300);
   const documentContainerRef = React.useRef<HTMLDivElement>(null);
   
-  const [inputError, setInputError] = React.useState<string | null>(null);
-
   const [currentAnalysisOptions, setCurrentAnalysisOptions] = React.useState<AnalysisOptions>(
       analysisOptions || { persona: 'layperson', focus: '' }
   );
@@ -96,32 +96,31 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
   const highlightTarget = citedClause || debouncedHoveredClause;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInputError(null);
     setContractText(e.target.value);
   };
   
   const handleFileSelect = (fileContent: string) => {
-    setInputError(null);
+    onClearError();
     setContractText(fileContent);
   };
 
   const handleSelectExample = (text: string) => {
-    setInputError(null);
+    onClearError();
     setContractText(text);
   };
   
   const handleClearText = () => {
-    setInputError(null);
+    onClearError();
     setContractText('');
   }
   
   const handleProceedToEnhance = () => {
-    setInputError(null);
+    onClearError();
     setStep('enhance');
   };
 
   const handleStartAnalysis = (options: AnalysisOptions) => {
-    setInputError(null);
+    onClearError();
     setCurrentAnalysisOptions(options); 
     setStep('processing');
     onAnalyze(contractText, options);
@@ -140,8 +139,6 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
   React.useEffect(() => {
     if ((debouncedHoveredClause.text || citedClause) && documentContainerRef.current) {
         const container = documentContainerRef.current;
-        // Query for the generic `mark` tag. Since only one highlight is active
-        // at a time, this is safe and avoids using a non-unique ID.
         const markElement = container.querySelector('mark');
         if (markElement) {
             markElement.scrollIntoView({
@@ -156,7 +153,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
     return (
       <div className="h-full flex flex-col">
           {error && (
-            <div className="flex items-start p-4 m-6 mb-0 bg-destructive/20 text-destructive-foreground rounded-lg text-sm border border-destructive/30">
+            <div className="flex items-start p-4 m-6 mb-0 bg-destructive/10 text-destructive-foreground rounded-lg text-sm border border-destructive/20">
                 <InfoIcon className="w-5 h-5 mr-3 text-destructive flex-shrink-0 mt-0.5" />
                 <div>
                     <h4 className="font-semibold">Analysis Incomplete</h4>
@@ -170,13 +167,13 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
                       <h2 className="text-sm font-semibold text-foreground truncate pr-4">{analysis.documentTitle}</h2>
                        <button 
                          onClick={onStartNew}
-                         className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground bg-card/50 hover:bg-muted/20 hover:text-foreground transition-colors border border-border"
+                         className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground bg-secondary/50 hover:bg-secondary hover:text-foreground transition-colors border border-border"
                        >
                          <ClipboardListIcon className="w-3 h-3"/>
-                         Analyze New Document
+                         Analyze New
                        </button>
                   </div>
-                  <div ref={documentContainerRef} className="p-4 text-sm text-muted-foreground overflow-y-auto font-mono whitespace-pre-wrap flex-1">
+                  <div ref={documentContainerRef} className="p-4 text-sm text-muted-foreground overflow-y-auto font-mono whitespace-pre-wrap flex-1 bg-background/50">
                       <HighlightableText text={contractText} highlight={highlightTarget} />
                   </div>
               </div>
@@ -215,13 +212,13 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
                 </p>
                 <div className="mt-6 flex items-center justify-center space-x-2 text-sm text-risk-low">
                   <LockIcon className="h-4 w-4" />
-                  <span>Your document is securely processed and never stored. Ever.</span>
+                  <span>Your document is securely processed and never stored.</span>
                 </div>
               </div>
               <div className="w-full max-w-4xl mt-8">
-                {inputError && (
+                {error && (
                     <div className="mb-4 text-center text-destructive-foreground bg-destructive/20 p-3 rounded-lg w-full max-w-4xl animate-fade-in text-sm border border-destructive/30">
-                        <p>{inputError}</p>
+                        <p>{error}</p>
                     </div>
                 )}
                 <ContractInput
@@ -230,7 +227,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
                   onFileSelect={handleFileSelect}
                   onDecode={handleProceedToEnhance}
                   isLoading={isLoading}
-                  onError={setInputError}
+                  onError={onSetError}
                   onClear={handleClearText}
                 />
                 <ExampleContracts onSelect={handleSelectExample} />
@@ -248,7 +245,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
           {step === 'processing' && <Loader progress={progress} />}
         </motion.div>
       </AnimatePresence>
-      {error && step !== 'processing' && !analysis && (
+      {error && step === 'processing' && !analysis && (
         <div className="mt-8 text-center text-destructive-foreground bg-destructive/20 p-4 rounded-lg w-full max-w-4xl animate-fade-in border border-destructive/30">
           <p>{error}</p>
         </div>

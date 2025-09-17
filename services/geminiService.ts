@@ -85,9 +85,6 @@ class GeminiService {
     this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
 
-  // FIX: Implement a public method to cancel any ongoing streaming operation.
-  // This is crucial for preventing "zombie" processes when the user navigates
-  // away from a view that has an active AI task.
   public cancelOngoingStreams = () => {
     if (this.streamAbortController) {
       this.streamAbortController.abort();
@@ -100,8 +97,6 @@ class GeminiService {
         ? analysis.keyTakeaways.map(t => `- ${t}`).join('\n')
         : `The document contains ${analysis.clauses.length} clauses.`;
     
-    // Provide a concise summary of each clause (ID and title) instead of the full text.
-    // This prevents the system prompt from exceeding the context window limit on large documents.
     const clauseContext = analysis.clauses.map(c => `Clause ID: ${c.id}, Title: "${c.title}"`).join('\n');
 
     const systemInstruction = `You are a helpful assistant who is an expert in legal documents. The user has just analyzed a document titled "${analysis.documentTitle}".
@@ -178,11 +173,6 @@ Answer the user's questions about this document in a clear, concise, and helpful
     }
   }
 
-  /**
-   * A robust text chunking algorithm that groups paragraphs together and only splits
-   * oversized paragraphs at the last sentence boundary. This preserves semantic 
-   * context and reduces the chance of breaking a single clause across multiple chunks.
-   */
   private chunkText(text: string, chunkSize = 4000): string[] {
     const paragraphs = text.split(/\n\s*\n/);
     const chunks: string[] = [];
@@ -192,7 +182,6 @@ Answer the user's questions about this document in a clear, concise, and helpful
         const trimmedParagraph = paragraph.trim();
         if (trimmedParagraph.length === 0) continue;
 
-        // If a single paragraph is larger than the chunk size, split it.
         if (trimmedParagraph.length > chunkSize) {
             if (currentChunk.length > 0) {
                 chunks.push(currentChunk);
@@ -200,12 +189,11 @@ Answer the user's questions about this document in a clear, concise, and helpful
             }
             let remainingPara = trimmedParagraph;
             while (remainingPara.length > chunkSize) {
-                // Split at the last sentence boundary before the chunk size limit.
                 let splitIndex = remainingPara.lastIndexOf('. ', chunkSize);
-                if (splitIndex === -1) { // If no sentence end, fall back to space.
+                if (splitIndex === -1) { 
                     splitIndex = remainingPara.lastIndexOf(' ', chunkSize);
                 }
-                if (splitIndex === -1) { // If no space, hard cut.
+                if (splitIndex === -1) { 
                     splitIndex = chunkSize;
                 }
                 chunks.push(remainingPara.substring(0, splitIndex + 1));
@@ -215,7 +203,6 @@ Answer the user's questions about this document in a clear, concise, and helpful
             continue;
         }
 
-        // If adding the next paragraph exceeds the chunk size, push the current chunk.
         if (currentChunk.length + trimmedParagraph.length + 2 > chunkSize && currentChunk.length > 0) {
             chunks.push(currentChunk);
             currentChunk = '';
@@ -243,9 +230,6 @@ Answer the user's questions about this document in a clear, concise, and helpful
   }
   
   private buildHeaderPrompt(clauses: DecodedClause[], options: AnalysisOptions): string {
-      // Send only the title and risk of each clause.
-      // This drastically reduces the prompt size for the final summarization step,
-      // preventing it from exceeding the context window limit on large documents.
       const clauseText = clauses.map(c => `Clause: ${c.title} (Risk: ${c.risk})`).join('\n');
       return `You are acting as a '${options.persona}'. Based on the following list of analyzed clauses from a legal document, provide a final summary.
       Generate a document title, an overall fairness score from 0-100 and a list of the 3-5 most important key takeaways.
@@ -275,7 +259,6 @@ Answer the user's questions about this document in a clear, concise, and helpful
         let processedChunks = 0;
         const allClauses: DecodedClause[] = [];
         
-        // A map to track occurrences of each unique clause text for robust highlighting.
         const clauseOccurrences: { [key: string]: number } = {};
 
         yield { type: 'progress', data: { current: 0, total: totalChunks } };
@@ -299,7 +282,6 @@ Answer the user's questions about this document in a clear, concise, and helpful
                     console.warn("Received empty response for a chunk, skipping.");
                     continue;
                 }
-                // The AI returns a partial clause object; we enrich it with our own metadata.
                 const partialClauses = JSON.parse(responseText) as Omit<DecodedClause, 'id' | 'occurrenceIndex'>[];
 
                 for (const partialClause of partialClauses) {
@@ -307,7 +289,6 @@ Answer the user's questions about this document in a clear, concise, and helpful
                     const count = clauseOccurrences[text] || 0;
                     clauseOccurrences[text] = count + 1;
                     
-                    // Enrich the clause with a unique ID and its occurrence index.
                     const clause: DecodedClause = {
                         ...partialClause,
                         id: `clause-${allClauses.length}`,
@@ -318,7 +299,7 @@ Answer the user's questions about this document in a clear, concise, and helpful
                     yield { type: 'clause', data: clause };
                 }
             } catch(e) {
-                if (e instanceof Error && e.name === 'AbortError') throw e; // Re-throw cancellation
+                if (e instanceof Error && e.name === 'AbortError') throw e; 
                 console.error("Failed to process a contract chunk:", e);
                 throw new Error(`Analysis failed while processing a part of the document. The results shown are incomplete.`);
             } finally {
@@ -351,13 +332,13 @@ Answer the user's questions about this document in a clear, concise, and helpful
   }
 
   public async compareDocuments(docA: string, docB: string): Promise<ComparisonResult> {
-      // Preemptively validate the combined length of the documents to prevent
-      // an inevitable API failure due to exceeding the model's token limit.
-      // This provides a much clearer, faster error message to the user.
       if (docA.length + docB.length > MAX_COMPARE_TEXT_LENGTH) {
           throw new Error(`The combined size of the documents is too large to be compared at once. Please shorten one or both documents and try again.`);
       }
 
+      // FIX: Removed the misleading AbortController logic. The generateContent API call
+      // is not cancellable, so pretending it is creates confusion and incorrect assumptions.
+      // The component logic has been updated to handle unmounts correctly without this.
       const sanitizedDocA = sanitizeInput(docA);
       const sanitizedDocB = sanitizeInput(docB);
 
@@ -386,7 +367,7 @@ Answer the user's questions about this document in a clear, concise, and helpful
               responseSchema: comparisonResultSchema,
           },
       });
-
+      
       return JSON.parse(response.text) as ComparisonResult;
   }
 }

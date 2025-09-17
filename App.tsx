@@ -11,6 +11,7 @@ import { DraftView } from './components/tools/DraftView';
 import { HistoryView } from './components/tools/HistoryView';
 import { DisclaimerModal } from './components/DisclaimerModal';
 import { motion, AnimatePresence } from 'framer-motion';
+import { LockIcon } from './components/icons/LockIcon';
 
 export type Tool = 'home' | 'analyze' | 'chat' | 'compare' | 'draft' | 'history';
 
@@ -29,8 +30,6 @@ interface AppState {
   isAiTyping: boolean;
   showDisclaimer: boolean;
   analysisPending: { text: string; options: AnalysisOptions } | null;
-  isDrafting: boolean;
-  draftResult: string;
   history: PersistedAnalysis[];
   currentAnalysisId: number | undefined;
   citedClause: { text: string; occurrence: number } | null;
@@ -55,14 +54,13 @@ type AppAction =
   | { type: 'CHAT_INIT_SUCCESS' }
   | { type: 'CHAT_INIT_FAILURE'; payload: string }
   | { type: 'SEND_CHAT_MESSAGE'; payload: { userMessage: ChatMessage; aiMessage: ChatMessage } }
+  | { type: 'RETRY_CHAT_MESSAGE'; payload: { aiMessage: ChatMessage } }
   | { type: 'STREAM_CHAT_RESPONSE'; payload: { id: string; fullResponse: string } }
   | { type: 'CHAT_RESPONSE_FAILURE'; payload: { id: string; error: string; originalMessage: string } }
   | { type: 'FINISH_CHAT_STREAM' }
-  | { type: 'DRAFT_START' }
-  | { type: 'DRAFT_UPDATE'; payload: string }
-  | { type: 'DRAFT_SUCCESS' }
-  | { type: 'DRAFT_FAILURE'; payload: string }
-  | { type: 'SET_CITED_CLAUSE'; payload: { text: string; occurrence: number } | null };
+  | { type: 'RESET_ACTIVE_ANALYSIS' }
+  | { type: 'SET_CITED_CLAUSE'; payload: { text: string; occurrence: number } | null }
+  | { type: 'CLEAR_ERROR' };
 
 const initialState: AppState = {
   activeTool: 'home',
@@ -77,8 +75,6 @@ const initialState: AppState = {
   isAiTyping: false,
   showDisclaimer: false,
   analysisPending: null,
-  isDrafting: false,
-  draftResult: '',
   history: [],
   currentAnalysisId: undefined,
   citedClause: null,
@@ -141,7 +137,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'ACCEPT_DISCLAIMER':
       return { ...state, showDisclaimer: false, analysisPending: null };
     case 'CLOSE_DISCLAIMER':
-      return { ...state, showDisclaimer: false };
+      // FIX: Clear the pending analysis state when the disclaimer is dismissed,
+      // preventing stale state from persisting.
+      return { ...state, showDisclaimer: false, analysisPending: null };
     case 'ANALYSIS_START':
       return {
         ...state,
@@ -156,7 +154,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
         isChatReady: false,
       };
     case 'SET_CONTRACT_TEXT':
-        return { ...state, contractText: action.payload };
+        // FIX: Clear any previous errors when the user starts modifying the input.
+        return { ...state, contractText: action.payload, error: null };
+    case 'CLEAR_ERROR':
+        return { ...state, error: null };
     case 'ANALYSIS_PROGRESS':
       return { ...state, progress: action.payload };
     case 'ANALYSIS_UPDATE':
@@ -176,12 +177,28 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, isChatReady: true };
     case 'CHAT_INIT_FAILURE':
       return { ...state, isChatReady: false, error: action.payload };
-    case 'SEND_CHAT_MESSAGE':
+    case 'SEND_CHAT_MESSAGE': {
+      // FIX: Filter out any previous, incomplete AI message bubbles.
+      // This handles the case where a user sends a new message while the AI is still "typing",
+      // preventing a stuck typing indicator from the cancelled stream.
+      const cleanedHistory = state.chatHistory.filter(
+        (msg) => !(msg.sender === 'ai' && msg.text === '' && !msg.error)
+      );
       return {
         ...state,
         isAiTyping: true,
-        chatHistory: [...state.chatHistory, action.payload.userMessage, action.payload.aiMessage],
+        chatHistory: [...cleanedHistory, action.payload.userMessage, action.payload.aiMessage],
       };
+    }
+    case 'RETRY_CHAT_MESSAGE': {
+      // Filter out the previous AI error message before retrying.
+      const cleanedHistory = state.chatHistory.filter(msg => !msg.error);
+      return {
+        ...state,
+        isAiTyping: true,
+        chatHistory: [...cleanedHistory, action.payload.aiMessage],
+      };
+    }
     case 'STREAM_CHAT_RESPONSE':
       return {
         ...state,
@@ -199,14 +216,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     case 'FINISH_CHAT_STREAM':
       return { ...state, isAiTyping: false };
-    case 'DRAFT_START':
-      return { ...state, error: null, isDrafting: true, draftResult: '' };
-    case 'DRAFT_UPDATE':
-      return { ...state, draftResult: action.payload };
-    case 'DRAFT_SUCCESS':
-      return { ...state, isDrafting: false };
-    case 'DRAFT_FAILURE':
-      return { ...state, isDrafting: false, error: action.payload };
+    case 'RESET_ACTIVE_ANALYSIS':
+        geminiService.cancelOngoingStreams();
+        return {
+            ...state,
+            contractText: '',
+            analysis: null,
+            chatHistory: [],
+            isDocumentLoaded: false,
+            error: null,
+            currentAnalysisId: undefined,
+            // Keep the user on the history page to see the result of their action
+            activeTool: 'history',
+            isChatReady: false,
+        };
     case 'SET_CITED_CLAUSE':
       return { ...state, citedClause: action.payload, activeTool: 'analyze' };
     default:
@@ -249,8 +272,6 @@ const App: React.FC = () => {
     localStorage.setItem('disclaimerAccepted', 'true');
     const pending = state.analysisPending;
     dispatch({ type: 'ACCEPT_DISCLAIMER' });
-    // FIX: Only start the pending analysis if there's actually text to analyze.
-    // This prevents an analysis from starting on an empty string on first load.
     if (pending && pending.text.trim()) {
       handleAnalyzeContract(pending.text, pending.options);
     }
@@ -290,31 +311,45 @@ const App: React.FC = () => {
     }
   };
 
+  /**
+   * FIX: Refactored chat streaming logic into a single helper to avoid code duplication.
+   * This handles the core logic for sending a message and processing the AI's response stream.
+   */
+  const _streamAiResponse = async (message: string, aiMessageId: string) => {
+      try {
+        let fullResponse = '';
+        for await (const chunk of geminiService.sendChatMessageStream(message)) {
+          fullResponse += chunk;
+          dispatch({ type: 'STREAM_CHAT_RESPONSE', payload: { id: aiMessageId, fullResponse } });
+        }
+      } catch (e) {
+        console.error("Chat failed:", e);
+        if (e instanceof Error && e.name === 'AbortError') {
+          console.log("Chat stream was cancelled.");
+          return; // Don't show an error if it was a user-initiated cancellation.
+        }
+        const errorText = e instanceof Error ? e.message : 'The AI failed to respond. Please try again.';
+        dispatch({ type: 'CHAT_RESPONSE_FAILURE', payload: { id: aiMessageId, error: errorText, originalMessage: message } });
+      } finally {
+        dispatch({ type: 'FINISH_CHAT_STREAM' });
+      }
+  };
+
   const handleSendMessage = async (message: string) => {
     const userMessage: ChatMessage = { id: Date.now().toString(), sender: 'user', text: message };
     const aiMessageId = (Date.now() + 1).toString();
     const aiTypingMessage: ChatMessage = { id: aiMessageId, sender: 'ai', text: '' };
 
     dispatch({ type: 'SEND_CHAT_MESSAGE', payload: { userMessage, aiMessage: aiTypingMessage } });
+    await _streamAiResponse(message, aiMessageId);
+  };
 
-    try {
-      let fullResponse = '';
-      for await (const chunk of geminiService.sendChatMessageStream(message)) {
-        fullResponse += chunk;
-        dispatch({ type: 'STREAM_CHAT_RESPONSE', payload: { id: aiMessageId, fullResponse } });
-      }
-    } catch (e) {
-      console.error("Chat failed:", e);
-      // Don't show an error if it was a user-initiated cancellation.
-      if (e instanceof Error && e.name === 'AbortError') {
-        console.log("Chat stream was cancelled.");
-        return;
-      }
-      const errorText = e instanceof Error ? e.message : 'The AI failed to respond. Please try again.';
-      dispatch({ type: 'CHAT_RESPONSE_FAILURE', payload: { id: aiMessageId, error: errorText, originalMessage: message } });
-    } finally {
-      dispatch({ type: 'FINISH_CHAT_STREAM' });
-    }
+  const handleRetryMessage = async (originalMessage: string) => {
+    const aiMessageId = (Date.now() + 1).toString();
+    const aiTypingMessage: ChatMessage = { id: aiMessageId, sender: 'ai', text: '' };
+
+    dispatch({ type: 'RETRY_CHAT_MESSAGE', payload: { aiMessage: aiTypingMessage } });
+    await _streamAiResponse(originalMessage, aiMessageId);
   };
   
    // Persist chat history whenever it changes, but not while AI is typing.
@@ -328,29 +363,15 @@ const App: React.FC = () => {
     }
   }, [state.chatHistory, state.isAiTyping, state.currentAnalysisId]);
 
-  const handleDraftDocument = async (prompt: string) => {
-    dispatch({ type: 'DRAFT_START' });
-    try {
-      let fullResponse = '';
-      for await (const chunk of geminiService.draftDocumentStream(prompt)) {
-        fullResponse += chunk;
-        dispatch({ type: 'DRAFT_UPDATE', payload: fullResponse });
-      }
-      dispatch({ type: 'DRAFT_SUCCESS' });
-    } catch (e) {
-      if (e instanceof Error && e.name === 'AbortError') {
-         console.log("Draft stream was cancelled.");
-         dispatch({ type: 'DRAFT_FAILURE', payload: "Drafting was cancelled." });
-         return;
-      }
-      const message = e instanceof Error ? e.message : 'An unknown error occurred while drafting.';
-      dispatch({ type: 'DRAFT_FAILURE', payload: message });
-    }
-  };
-
   const handleDeleteAnalysis = async (id: number) => {
+    const isDeletingCurrent = state.currentAnalysisId === id;
+    
     await deleteAnalysis(id);
     await loadHistory();
+
+    if (isDeletingCurrent) {
+        dispatch({ type: 'RESET_ACTIVE_ANALYSIS' });
+    }
   };
 
   const handleClauseCitationClick = (clauseId: string) => {
@@ -377,25 +398,22 @@ const App: React.FC = () => {
           progress={state.progress}
           analysisOptions={state.analysisOptions}
           citedClause={state.citedClause}
+          onSetError={(message) => dispatch({ type: 'ANALYSIS_FAILURE', payload: message })}
+          onClearError={() => dispatch({ type: 'CLEAR_ERROR' })}
         />;
       case 'chat':
         return state.isDocumentLoaded ?
           <ChatView
             chatHistory={state.chatHistory}
             onSendMessage={handleSendMessage}
+            onRetryMessage={handleRetryMessage}
             isAiTyping={state.isAiTyping}
             onClauseClick={handleClauseCitationClick}
           /> : <HomeView onStartAnalysis={() => dispatch({ type: 'SET_TOOL', payload: 'analyze' })} />;
       case 'compare':
         return <CompareView initialDocument={state.contractText} />
       case 'draft':
-        return <DraftView
-          onDraft={handleDraftDocument}
-          isDrafting={state.isDrafting}
-          draftResult={state.draftResult}
-          setDraftResult={(result) => dispatch({ type: 'DRAFT_UPDATE', payload: result })}
-          error={state.error}
-        />
+        return <DraftView />;
       case 'history':
         return <HistoryView
           history={state.history}
@@ -419,20 +437,28 @@ const App: React.FC = () => {
         setActiveTool={(tool) => dispatch({ type: 'SET_TOOL', payload: tool })}
         isDocumentLoaded={state.isDocumentLoaded}
       />
-      <main ref={mainContentRef} className="flex-1 overflow-y-auto overflow-x-hidden relative">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={state.activeTool}
-            initial={{ opacity: 0, scale: 0.99 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.99 }}
-            transition={{ duration: 0.35, ease: 'easeInOut' }}
-            className="h-full"
-          >
-            {renderTool()}
-          </motion.div>
-        </AnimatePresence>
-      </main>
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <main ref={mainContentRef} className="flex-1 overflow-y-auto overflow-x-hidden relative">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={state.activeTool}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="h-full"
+            >
+              {renderTool()}
+            </motion.div>
+          </AnimatePresence>
+        </main>
+        <footer className="flex-shrink-0 p-2 text-center text-xs text-muted-foreground border-t border-border bg-background/50 backdrop-blur-sm">
+            <div className="flex items-center justify-center gap-2 max-w-4xl mx-auto">
+                <LockIcon className="w-3 h-3 flex-shrink-0" />
+                <span>BETA RELEASE. Documents are processed securely in-memory and are never stored.</span>
+            </div>
+        </footer>
+      </div>
     </div>
   );
 };
