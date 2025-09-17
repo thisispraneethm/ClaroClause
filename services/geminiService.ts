@@ -75,6 +75,7 @@ const comparisonResultSchema = {
 class GeminiService {
   private ai: GoogleGenAI;
   private chat: Chat | null = null;
+  private streamAbortController: AbortController | null = null;
 
   constructor() {
     if (!process.env.API_KEY) {
@@ -82,6 +83,16 @@ class GeminiService {
     }
     this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
+
+  // FIX: Implement a public method to cancel any ongoing streaming operation.
+  // This is crucial for preventing "zombie" processes when the user navigates
+  // away from a view that has an active AI task.
+  public cancelOngoingStreams = () => {
+    if (this.streamAbortController) {
+      this.streamAbortController.abort();
+      this.streamAbortController = null;
+    }
+  };
 
   public async initializeChat(analysis: ContractAnalysis): Promise<void> {
     const contextSummary = (analysis.keyTakeaways && analysis.keyTakeaways.length > 0)
@@ -118,9 +129,22 @@ Answer the user's questions about this document in a clear, concise, and helpful
     if (!message) {
       throw new Error("Cannot send an empty message.");
     }
-    const result = await this.chat.sendMessageStream({ message });
-    for await (const chunk of result) {
-        yield chunk.text;
+
+    this.cancelOngoingStreams();
+    this.streamAbortController = new AbortController();
+    const signal = this.streamAbortController.signal;
+
+    try {
+        const result = await this.chat.sendMessageStream({ message });
+        for await (const chunk of result) {
+            if (signal.aborted) { 
+                console.log("Chat stream aborted.");
+                throw new DOMException('Stream aborted by user', 'AbortError');
+            }
+            yield chunk.text;
+        }
+    } finally {
+        this.streamAbortController = null;
     }
   }
 
@@ -132,12 +156,24 @@ Answer the user's questions about this document in a clear, concise, and helpful
     Prompt: "${prompt}"
     Based on the prompt, generate a well-structured document. If the prompt is ambiguous, create a standard version of the requested document.`;
 
-    const result = await this.ai.models.generateContentStream({ 
-        model: 'gemini-2.5-flash',
-        contents: fullPrompt,
-    });
-    for await (const chunk of result) {
-        yield chunk.text;
+    this.cancelOngoingStreams();
+    this.streamAbortController = new AbortController();
+    const signal = this.streamAbortController.signal;
+
+    try {
+        const result = await this.ai.models.generateContentStream({ 
+            model: 'gemini-2.5-flash',
+            contents: fullPrompt,
+        });
+        for await (const chunk of result) {
+            if (signal.aborted) {
+                console.log("Draft stream aborted.");
+                throw new DOMException('Stream aborted by user', 'AbortError');
+            }
+            yield chunk.text;
+        }
+    } finally {
+        this.streamAbortController = null;
     }
   }
 
@@ -228,74 +264,88 @@ Answer the user's questions about this document in a clear, concise, and helpful
         focus: sanitizeInput(options.focus),
     };
 
-    const chunks = this.chunkText(sanitizedContractText);
-    const totalChunks = chunks.length;
-    let processedChunks = 0;
-    const allClauses: DecodedClause[] = [];
-    
-    // A map to track occurrences of each unique clause text for robust highlighting.
-    const clauseOccurrences: { [key: string]: number } = {};
+    this.cancelOngoingStreams();
+    this.streamAbortController = new AbortController();
+    const signal = this.streamAbortController.signal;
 
-    yield { type: 'progress', data: { current: 0, total: totalChunks } };
-    
-    for (const chunk of chunks) {
-        try {
-            const response = await this.ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: this.buildClausePrompt(chunk, sanitizedOptions),
-                config: {
-                    responseMimeType: 'application/json',
-                    responseSchema: analysisSchema,
-                },
-            });
-            const responseText = response.text?.trim();
-            if (!responseText) {
-                 console.warn("Received empty response for a chunk, skipping.");
-                 continue;
+    try {
+        const chunks = this.chunkText(sanitizedContractText);
+        const totalChunks = chunks.length;
+        let processedChunks = 0;
+        const allClauses: DecodedClause[] = [];
+        
+        // A map to track occurrences of each unique clause text for robust highlighting.
+        const clauseOccurrences: { [key: string]: number } = {};
+
+        yield { type: 'progress', data: { current: 0, total: totalChunks } };
+        
+        for (const chunk of chunks) {
+            if (signal.aborted) {
+                console.warn("Analysis stream aborted by user action.");
+                throw new DOMException('Stream aborted by user', 'AbortError');
             }
-            // The AI returns a partial clause object; we enrich it with our own metadata.
-            const partialClauses = JSON.parse(responseText) as Omit<DecodedClause, 'id' | 'occurrenceIndex'>[];
-
-            for (const partialClause of partialClauses) {
-                const text = partialClause.originalClause;
-                const count = clauseOccurrences[text] || 0;
-                clauseOccurrences[text] = count + 1;
-                
-                // Enrich the clause with a unique ID and its occurrence index.
-                const clause: DecodedClause = {
-                    ...partialClause,
-                    id: `clause-${allClauses.length}`,
-                    occurrenceIndex: count,
-                };
-
-                allClauses.push(clause);
-                yield { type: 'clause', data: clause };
-            }
-        } catch(e) {
-            console.error("Failed to process a contract chunk:", e);
-            throw new Error(`Analysis failed while processing a part of the document. The results shown are incomplete.`);
-        } finally {
-            processedChunks++;
-            yield { type: 'progress', data: { current: processedChunks, total: totalChunks } };
-        }
-    }
-
-
-    if (allClauses.length > 0) {
-        try {
-            const response = await this.ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: this.buildHeaderPrompt(allClauses, sanitizedOptions),
-                config: {
-                    responseMimeType: 'application/json',
-                    responseSchema: headerSchema,
+            try {
+                const response = await this.ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: this.buildClausePrompt(chunk, sanitizedOptions),
+                    config: {
+                        responseMimeType: 'application/json',
+                        responseSchema: analysisSchema,
+                    },
+                });
+                const responseText = response.text?.trim();
+                if (!responseText) {
+                    console.warn("Received empty response for a chunk, skipping.");
+                    continue;
                 }
-            });
-            yield { type: 'header', data: JSON.parse(response.text) };
-        } catch (e) {
-            console.error("Failed to generate analysis header:", e);
-            throw new Error('Could not generate the final summary, but the clause breakdown is available.');
+                // The AI returns a partial clause object; we enrich it with our own metadata.
+                const partialClauses = JSON.parse(responseText) as Omit<DecodedClause, 'id' | 'occurrenceIndex'>[];
+
+                for (const partialClause of partialClauses) {
+                    const text = partialClause.originalClause;
+                    const count = clauseOccurrences[text] || 0;
+                    clauseOccurrences[text] = count + 1;
+                    
+                    // Enrich the clause with a unique ID and its occurrence index.
+                    const clause: DecodedClause = {
+                        ...partialClause,
+                        id: `clause-${allClauses.length}`,
+                        occurrenceIndex: count,
+                    };
+
+                    allClauses.push(clause);
+                    yield { type: 'clause', data: clause };
+                }
+            } catch(e) {
+                if (e instanceof Error && e.name === 'AbortError') throw e; // Re-throw cancellation
+                console.error("Failed to process a contract chunk:", e);
+                throw new Error(`Analysis failed while processing a part of the document. The results shown are incomplete.`);
+            } finally {
+                processedChunks++;
+                yield { type: 'progress', data: { current: processedChunks, total: totalChunks } };
+            }
         }
+
+        if (signal.aborted) { throw new DOMException('Stream aborted by user', 'AbortError'); }
+
+        if (allClauses.length > 0) {
+            try {
+                const response = await this.ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: this.buildHeaderPrompt(allClauses, sanitizedOptions),
+                    config: {
+                        responseMimeType: 'application/json',
+                        responseSchema: headerSchema,
+                    }
+                });
+                yield { type: 'header', data: JSON.parse(response.text) };
+            } catch (e) {
+                console.error("Failed to generate analysis header:", e);
+                throw new Error('Could not generate the final summary, but the clause breakdown is available.');
+            }
+        }
+    } finally {
+        this.streamAbortController = null;
     }
   }
 

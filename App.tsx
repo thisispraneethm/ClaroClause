@@ -88,6 +88,10 @@ const initialState: AppState = {
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_TOOL':
+      // FIX: Cancel any ongoing AI streams when the user switches tools.
+      // This prevents "zombie" processes, resource leaks, and state corruption
+      // from background tasks affecting the wrong view.
+      geminiService.cancelOngoingStreams();
       return { ...state, activeTool: action.payload, error: null, citedClause: null };
     case 'SET_HISTORY':
       return { ...state, history: action.payload };
@@ -104,6 +108,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
     case 'START_NEW':
+      geminiService.cancelOngoingStreams();
       return {
         ...state,
         contractText: '',
@@ -116,6 +121,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         isChatReady: false,
       };
     case 'LOAD_ANALYSIS': {
+      geminiService.cancelOngoingStreams();
       const item = action.payload;
       return {
         ...state,
@@ -299,6 +305,11 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error("Chat failed:", e);
+      // Don't show an error if it was a user-initiated cancellation.
+      if (e instanceof Error && e.name === 'AbortError') {
+        console.log("Chat stream was cancelled.");
+        return;
+      }
       const errorText = e instanceof Error ? e.message : 'The AI failed to respond. Please try again.';
       dispatch({ type: 'CHAT_RESPONSE_FAILURE', payload: { id: aiMessageId, error: errorText, originalMessage: message } });
     } finally {
@@ -327,6 +338,11 @@ const App: React.FC = () => {
       }
       dispatch({ type: 'DRAFT_SUCCESS' });
     } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+         console.log("Draft stream was cancelled.");
+         dispatch({ type: 'DRAFT_FAILURE', payload: "Drafting was cancelled." });
+         return;
+      }
       const message = e instanceof Error ? e.message : 'An unknown error occurred while drafting.';
       dispatch({ type: 'DRAFT_FAILURE', payload: message });
     }
