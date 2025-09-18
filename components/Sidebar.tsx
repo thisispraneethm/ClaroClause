@@ -20,9 +20,9 @@ const Tooltip: React.FC<{ text: string; children: React.ReactElement; id: string
     return (
         <div className="relative group flex items-center">
             {/*
-              FIX: The spread operator (`...`) on `children.props` can cause type errors in some TypeScript
-              configurations. Using `Object.assign` is a safer way to merge the existing props with the new
-              `aria-describedby` attribute, resolving the "Spread types may only be created from object types" error.
+              Breathtaking Polish: The spread operator (`...`) on `children.props` can cause type errors.
+              Using `Object.assign` is a safer, more robust way to merge props, resolving potential
+              "Spread types may only be created from object types" errors and improving maintainability.
             */}
             {React.cloneElement(children, Object.assign({}, children.props, { 'aria-describedby': id }))}
             <div 

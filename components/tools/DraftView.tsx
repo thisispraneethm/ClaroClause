@@ -15,12 +15,17 @@ export const DraftView: React.FC = () => {
   const promptTextareaRef = React.useRef<HTMLTextAreaElement>(null);
   const resultTextareaRef = React.useRef<HTMLTextAreaElement>(null);
   const copyTimeoutRef = React.useRef<number | null>(null);
+  const isMounted = React.useRef(true);
 
   React.useEffect(() => {
+    isMounted.current = true;
+    // Cleanup function runs when the component unmounts.
     return () => {
-        if (copyTimeoutRef.current) {
-            clearTimeout(copyTimeoutRef.current);
-        }
+      isMounted.current = false;
+      geminiService.cancelOngoingStreams();
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -35,18 +40,26 @@ export const DraftView: React.FC = () => {
       let fullResponse = '';
       for await (const chunk of geminiService.draftDocumentStream(prompt)) {
         fullResponse += chunk;
-        setResult(fullResponse);
+        if (isMounted.current) {
+          setResult(fullResponse);
+        }
       }
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') {
          console.log("Draft stream was cancelled.");
-         setError("Drafting was cancelled.");
+         if (isMounted.current) {
+            setError("Drafting was cancelled.");
+         }
          return;
       }
       const message = e instanceof Error ? e.message : 'An unknown error occurred while drafting.';
-      setError(message);
+      if (isMounted.current) {
+        setError(message);
+      }
     } finally {
-        setIsDrafting(false);
+        if (isMounted.current) {
+            setIsDrafting(false);
+        }
     }
   };
 

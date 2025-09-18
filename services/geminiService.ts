@@ -120,7 +120,12 @@ class GeminiService {
   public cancelOngoingStreams = () => {
     if (this.streamAbortController) {
       this.streamAbortController.abort();
-      this.streamAbortController = null;
+      // FIX: Do not nullify the controller here. The 'finally' block of the
+      // stream that created the controller is responsible for cleanup.
+      // Nullifying it here creates a race condition where a stream can become
+      // un-cancellable if another action (like a rapid second stream start)
+      // clears the controller reference prematurely.
+      // this.streamAbortController = null;
     }
   };
 
@@ -162,8 +167,9 @@ Answer the user's questions about this document in a clear, concise, and helpful
     const sanitizedMessage = sanitizeInput(message);
 
     this.cancelOngoingStreams();
-    this.streamAbortController = new AbortController();
-    const signal = this.streamAbortController.signal;
+    const localAbortController = new AbortController();
+    this.streamAbortController = localAbortController;
+    const signal = localAbortController.signal;
 
     try {
         const result = await this.chat.sendMessageStream({ message: sanitizedMessage });
@@ -175,7 +181,9 @@ Answer the user's questions about this document in a clear, concise, and helpful
             yield chunk.text;
         }
     } finally {
-        this.streamAbortController = null;
+        if (this.streamAbortController === localAbortController) {
+            this.streamAbortController = null;
+        }
     }
   }
 
@@ -191,8 +199,9 @@ Answer the user's questions about this document in a clear, concise, and helpful
     Based on the prompt, generate a well-structured document. If the prompt is ambiguous, create a standard version of the requested document.`;
 
     this.cancelOngoingStreams();
-    this.streamAbortController = new AbortController();
-    const signal = this.streamAbortController.signal;
+    const localAbortController = new AbortController();
+    this.streamAbortController = localAbortController;
+    const signal = localAbortController.signal;
 
     try {
         const result = await this.ai.models.generateContentStream({ 
@@ -207,7 +216,9 @@ Answer the user's questions about this document in a clear, concise, and helpful
             yield chunk.text;
         }
     } finally {
-        this.streamAbortController = null;
+        if (this.streamAbortController === localAbortController) {
+            this.streamAbortController = null;
+        }
     }
   }
 
@@ -288,8 +299,9 @@ Answer the user's questions about this document in a clear, concise, and helpful
     };
 
     this.cancelOngoingStreams();
-    this.streamAbortController = new AbortController();
-    const signal = this.streamAbortController.signal;
+    const localAbortController = new AbortController();
+    this.streamAbortController = localAbortController;
+    const signal = localAbortController.signal;
 
     try {
         const chunks = this.chunkText(sanitizedContractText);
@@ -374,7 +386,9 @@ Answer the user's questions about this document in a clear, concise, and helpful
             }
         }
     } finally {
-        this.streamAbortController = null;
+        if (this.streamAbortController === localAbortController) {
+            this.streamAbortController = null;
+        }
     }
   }
 
@@ -383,9 +397,9 @@ Answer the user's questions about this document in a clear, concise, and helpful
           throw new Error(`The combined size of the documents is too large to be compared at once. Please shorten one or both documents and try again.`);
       }
 
-      // FIX: Removed the misleading AbortController logic. The generateContent API call
+      // Breathtaking Polish: Removed the misleading AbortController logic. The generateContent API call
       // is not cancellable, so pretending it is creates confusion and incorrect assumptions.
-      // The component logic has been updated to handle unmounts correctly without this.
+      // Component-level cleanup is the correct pattern for handling unmounts.
       const sanitizedDocA = sanitizeInput(docA);
       const sanitizedDocB = sanitizeInput(docB);
 

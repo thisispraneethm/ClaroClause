@@ -153,12 +153,17 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
     return (
       <div className="h-full flex flex-col">
           {error && (
-            <div className="flex items-start p-4 m-6 mb-0 bg-destructive/10 text-destructive-foreground rounded-lg text-sm border border-destructive/20">
-                <InfoIcon className="w-5 h-5 mr-3 text-destructive flex-shrink-0 mt-0.5" />
-                <div>
-                    <h4 className="font-semibold">Analysis Incomplete</h4>
-                    <p className="mt-1 opacity-90">{error}</p>
+            <div className="relative p-4 m-6 mb-0 bg-destructive/10 text-destructive-foreground rounded-lg text-sm border border-destructive/20">
+                <div className="flex items-start pr-8">
+                    <InfoIcon className="w-5 h-5 mr-3 text-destructive flex-shrink-0 mt-0.5" />
+                    <div>
+                        <h4 className="font-semibold">Analysis Incomplete</h4>
+                        <p className="mt-1 opacity-90">{error}</p>
+                    </div>
                 </div>
+                <button onClick={onClearError} aria-label="Clear error" className="absolute top-3 right-3 p-1 rounded-full hover:bg-destructive/30 transition-colors">
+                    <XIcon className="w-4 h-4" />
+                </button>
             </div>
            )}
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 overflow-hidden">
@@ -212,13 +217,16 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
                 </p>
                 <div className="mt-6 flex items-center justify-center space-x-2 text-sm text-risk-low">
                   <LockIcon className="h-4 w-4" />
-                  <span>Your document is securely processed and never stored.</span>
+                  <span>Your documents are processed and stored locally in your browser.</span>
                 </div>
               </div>
               <div className="w-full max-w-4xl mt-8">
                 {error && (
-                    <div className="mb-4 text-center text-destructive-foreground bg-destructive/20 p-3 rounded-lg w-full max-w-4xl animate-fade-in text-sm border border-destructive/30">
+                    <div className="relative mb-4 text-left text-destructive-foreground bg-destructive/20 p-3 pl-4 pr-10 rounded-lg w-full max-w-4xl animate-fade-in text-sm border border-destructive/30">
                         <p>{error}</p>
+                        <button onClick={onClearError} aria-label="Clear error" className="absolute top-1/2 right-2 -translate-y-1/2 p-1 rounded-full hover:bg-destructive/30 transition-colors">
+                            <XIcon className="w-4 h-4" />
+                        </button>
                     </div>
                 )}
                 <ContractInput

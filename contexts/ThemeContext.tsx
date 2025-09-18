@@ -11,10 +11,14 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
-    // 1. Check localStorage for a saved theme
-    const savedTheme = localStorage.getItem('theme') as Theme | null;
-    if (savedTheme) {
-      return savedTheme;
+    try {
+        // 1. Check localStorage for a saved theme
+        const savedTheme = localStorage.getItem('theme') as Theme | null;
+        if (savedTheme) {
+            return savedTheme;
+        }
+    } catch (e) {
+        console.warn("Could not access localStorage to get theme:", e);
     }
     // 2. Check for system preference (default to dark if system is light)
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
@@ -32,7 +36,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } else {
       root.removeAttribute('data-theme');
     }
-    localStorage.setItem('theme', theme);
+    try {
+        localStorage.setItem('theme', theme);
+    } catch (e) {
+        console.warn("Could not access localStorage to set theme:", e);
+    }
   }, [theme]);
 
   const toggleTheme = () => {

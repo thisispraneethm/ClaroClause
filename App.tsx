@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect } from 'react';
 import type { ContractAnalysis, ChatMessage, AnalysisOptions, DecodedClause } from './types';
 import { geminiService } from './services/geminiService';
 import { getLatestAnalysis, saveAnalysis, getAllAnalyses, deleteAnalysis, PersistedAnalysis, updateChatHistory } from './services/dbService';
@@ -34,6 +34,7 @@ interface AppState {
   currentAnalysisId: number | undefined;
   citedClause: { text: string; occurrence: number } | null;
   progress: { current: number; total: number } | null;
+  deletingId: number | null;
 }
 
 type AppAction =
@@ -59,6 +60,8 @@ type AppAction =
   | { type: 'CHAT_RESPONSE_FAILURE'; payload: { id: string; error: string; originalMessage: string } }
   | { type: 'FINISH_CHAT_STREAM' }
   | { type: 'RESET_ACTIVE_ANALYSIS' }
+  | { type: 'DELETE_ANALYSIS_START'; payload: number }
+  | { type: 'DELETE_ANALYSIS_FINISH' }
   | { type: 'ANALYSIS_DELETED_EXTERNALLY' }
   | { type: 'SET_CITED_CLAUSE'; payload: { text: string; occurrence: number } | null }
   | { type: 'CLEAR_ERROR' };
@@ -80,6 +83,7 @@ const initialState: AppState = {
   currentAnalysisId: undefined,
   citedClause: null,
   progress: null,
+  deletingId: null,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -89,6 +93,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       // This prevents "zombie" processes, resource leaks, and state corruption
       // from background tasks affecting the wrong view.
       geminiService.cancelOngoingStreams();
+      // When navigating away from a citation, clear it.
       return { ...state, activeTool: action.payload, error: null, citedClause: null };
     case 'SET_HISTORY':
       return { ...state, history: action.payload };
@@ -154,9 +159,23 @@ function appReducer(state: AppState, action: AppAction): AppState {
         progress: null,
         isChatReady: false,
       };
-    case 'SET_CONTRACT_TEXT':
-        // FIX: Clear any previous errors when the user starts modifying the input.
-        return { ...state, contractText: action.payload, error: null };
+    case 'SET_CONTRACT_TEXT': {
+        // BUG FIX: When text is modified on a loaded document, it becomes a "new"
+        // document. Reset analysis and chat state to prevent inconsistency where
+        // the chat context refers to a different document than the one displayed.
+        const isModifyingLoadedDoc = state.isDocumentLoaded;
+        return {
+            ...state,
+            contractText: action.payload,
+            error: null,
+            // If they had a document loaded, changing the text invalidates it.
+            analysis: isModifyingLoadedDoc ? null : state.analysis,
+            chatHistory: isModifyingLoadedDoc ? [] : state.chatHistory,
+            isDocumentLoaded: isModifyingLoadedDoc ? false : state.isDocumentLoaded,
+            currentAnalysisId: isModifyingLoadedDoc ? undefined : state.currentAnalysisId,
+            isChatReady: isModifyingLoadedDoc ? false : state.isChatReady,
+        };
+    }
     case 'CLEAR_ERROR':
         return { ...state, error: null };
     case 'ANALYSIS_PROGRESS':
@@ -231,6 +250,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
             activeTool: 'history',
             isChatReady: false,
         };
+    case 'DELETE_ANALYSIS_START':
+      return { ...state, deletingId: action.payload };
+    case 'DELETE_ANALYSIS_FINISH':
+      return { ...state, deletingId: null };
     case 'ANALYSIS_DELETED_EXTERNALLY':
         // FIX: Handle the case where the active analysis was deleted (e.g., in another tab).
         // This provides clear feedback to the user and prevents silent failures.
@@ -255,6 +278,29 @@ function appReducer(state: AppState, action: AppAction): AppState {
 const App: React.FC = () => {
   const [state, dispatch] = React.useReducer(appReducer, initialState);
   const mainContentRef = React.useRef<HTMLDivElement>(null);
+  const historyScrollPos = React.useRef(0);
+
+  /**
+   * BUG FIX: Preserves the scroll position of the History view.
+   * This effect saves the scroll position when navigating away from the history tool
+   * and restores it upon returning, preventing the jarring UX of the list resetting to the top.
+   */
+  useLayoutEffect(() => {
+    const mainEl = mainContentRef.current;
+    if (state.activeTool === 'history' && mainEl) {
+        // When navigating TO history, restore scroll position.
+        mainEl.scrollTop = historyScrollPos.current;
+    }
+
+    // The cleanup function runs when the effect's dependency changes,
+    // capturing the state from its render scope.
+    return () => {
+        if (state.activeTool === 'history' && mainEl) {
+            // When navigating AWAY from history, save scroll position.
+            historyScrollPos.current = mainEl.scrollTop;
+        }
+    }
+  }, [state.activeTool]);
 
   const loadHistory = async () => {
     const allAnalyses = await getAllAnalyses();
@@ -297,7 +343,13 @@ const App: React.FC = () => {
   }, [state.isDocumentLoaded, state.analysis, handleInitializeChat]);
 
   const handleAcceptDisclaimer = () => {
-    localStorage.setItem('disclaimerAccepted', 'true');
+    // FIX: Wrap localStorage access in a try-catch to prevent crashes in
+    // environments where it's disabled (e.g., private browsing).
+    try {
+      localStorage.setItem('disclaimerAccepted', 'true');
+    } catch (e) {
+      console.warn("Could not save disclaimer acceptance to localStorage:", e);
+    }
     const pending = state.analysisPending;
     dispatch({ type: 'ACCEPT_DISCLAIMER' });
     if (pending && pending.text.trim()) {
@@ -306,7 +358,14 @@ const App: React.FC = () => {
   };
 
   const handleAnalyzeContract = async (text: string, options: AnalysisOptions) => {
-    if (localStorage.getItem('disclaimerAccepted') !== 'true') {
+    let disclaimerAccepted = false;
+    try {
+      disclaimerAccepted = localStorage.getItem('disclaimerAccepted') === 'true';
+    } catch (e) {
+      console.warn("Could not read from localStorage:", e);
+    }
+
+    if (!disclaimerAccepted) {
       dispatch({ type: 'SHOW_DISCLAIMER', payload: { text, options } });
       return;
     }
@@ -327,6 +386,16 @@ const App: React.FC = () => {
           tempAnalysis.keyTakeaways = event.data.keyTakeaways;
         }
       }
+
+      /**
+       * BUG FIX: Handle silent failure when no clauses are found.
+       * If the AI returns no clauses, the application now throws a user-friendly
+       * error instead of showing a confusing, empty results screen.
+       */
+      if (tempAnalysis.clauses.length === 0) {
+        throw new Error("No clauses could be identified in the provided document. Please check the document's formatting or try analyzing a different text.");
+      }
+
       dispatch({ type: 'ANALYSIS_UPDATE', payload: { ...tempAnalysis } });
       const savedId = await saveAnalysis(text, tempAnalysis, options, []);
       dispatch({ type: 'ANALYSIS_SUCCESS', payload: { analysis: tempAnalysis, id: savedId } });
@@ -406,13 +475,20 @@ const App: React.FC = () => {
   }, [state.chatHistory, state.isAiTyping, state.currentAnalysisId]);
 
   const handleDeleteAnalysis = async (id: number) => {
-    const isDeletingCurrent = state.currentAnalysisId === id;
-    
-    await deleteAnalysis(id);
-    await loadHistory();
+    // BUG FIX: Prevent concurrent delete operations by checking the deletingId state.
+    if (state.deletingId !== null) return;
 
-    if (isDeletingCurrent) {
-        dispatch({ type: 'RESET_ACTIVE_ANALYSIS' });
+    dispatch({ type: 'DELETE_ANALYSIS_START', payload: id });
+    try {
+        const isDeletingCurrent = state.currentAnalysisId === id;
+        await deleteAnalysis(id);
+        await loadHistory();
+
+        if (isDeletingCurrent) {
+            dispatch({ type: 'RESET_ACTIVE_ANALYSIS' });
+        }
+    } finally {
+        dispatch({ type: 'DELETE_ANALYSIS_FINISH' });
     }
   };
 
@@ -463,6 +539,7 @@ const App: React.FC = () => {
           history={state.history}
           onLoad={(item) => dispatch({ type: 'LOAD_ANALYSIS', payload: item })}
           onDelete={handleDeleteAnalysis}
+          deletingId={state.deletingId}
         />
       default:
         return <HomeView onStartAnalysis={() => dispatch({ type: 'SET_TOOL', payload: 'analyze' })} />;
@@ -499,7 +576,7 @@ const App: React.FC = () => {
         <footer className="flex-shrink-0 p-2 text-center text-xs text-muted-foreground border-t border-border bg-background/50 backdrop-blur-sm">
             <div className="flex items-center justify-center gap-2 max-w-4xl mx-auto">
                 <LockIcon className="w-3 h-3 flex-shrink-0" />
-                <span>BETA RELEASE. Documents are processed securely in-memory and are never stored.</span>
+                <span>BETA RELEASE. Your documents are processed and stored locally in your browser. They are never uploaded to our servers.</span>
             </div>
         </footer>
       </div>

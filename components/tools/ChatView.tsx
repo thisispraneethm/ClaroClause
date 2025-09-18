@@ -189,6 +189,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, 
   }, [chatHistory, isAiTyping]);
 
   React.useEffect(() => {
+    // Automatically focus the input when the chat first becomes ready for a new conversation.
+    if (isChatReady && chatHistory.length === 0) {
+      textareaRef.current?.focus();
+    }
+  }, [isChatReady, chatHistory.length]);
+
+  React.useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
         textarea.style.height = 'auto';

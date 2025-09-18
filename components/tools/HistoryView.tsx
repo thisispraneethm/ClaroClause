@@ -10,9 +10,10 @@ interface HistoryViewProps {
   history: PersistedAnalysis[];
   onLoad: (item: PersistedAnalysis) => void;
   onDelete: (id: number) => void;
+  deletingId: number | null;
 }
 
-const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDelete: () => void; }> = ({ item, onLoad, onDelete }) => {
+const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDelete: () => void; isDeleting: boolean; }> = ({ item, onLoad, onDelete, isDeleting }) => {
     const formatDate = (date: Date) => {
         return new Intl.DateTimeFormat('en-US', {
             dateStyle: 'medium',
@@ -53,8 +54,9 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
         >
             <button
                 onClick={onLoad}
+                disabled={isDeleting}
                 aria-label={`Load analysis for ${item.documentTitle || 'Untitled Document'}`}
-                className="w-full text-left glass-panel p-4 rounded-xl flex items-center justify-between transition-all duration-200 hover:bg-white/5 hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full text-left glass-panel p-4 rounded-xl flex items-center justify-between transition-all duration-200 hover:bg-white/5 hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:transform-none"
             >
                 <div className="flex-1 overflow-hidden">
                     <h3 className="font-semibold truncate pr-2 text-card-foreground" title={item.documentTitle}>
@@ -77,11 +79,16 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
                 <div className="flex items-center gap-2 flex-shrink-0 pl-4">
                     <button
                         onClick={handleDelete}
+                        disabled={isDeleting}
                         title="Delete Analysis"
                         aria-label={`Delete analysis for ${item.documentTitle || 'Untitled Document'}`}
-                        className="p-2 rounded-full text-muted-foreground hover:bg-red-500/20 hover:text-red-400 transition-colors z-10"
+                        className="w-9 h-9 flex items-center justify-center rounded-full text-muted-foreground hover:bg-red-500/20 hover:text-red-400 transition-colors z-10 disabled:cursor-not-allowed"
                     >
-                        <XIcon className="w-4 h-4" />
+                        {isDeleting ? (
+                            <div className="w-4 h-4 rounded-full animate-spin border-2 border-dashed border-destructive border-t-transparent"></div>
+                        ) : (
+                            <XIcon className="w-4 h-4" />
+                        )}
                     </button>
                 </div>
             </button>
@@ -89,7 +96,7 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
     );
 };
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ history, onLoad, onDelete }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ history, onLoad, onDelete, deletingId }) => {
   return (
     <div className="max-w-4xl mx-auto p-6 md:p-8">
       <motion.div
@@ -129,6 +136,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onLoad, onDel
                             item={item}
                             onLoad={() => onLoad(item)}
                             onDelete={() => item.id && onDelete(item.id)}
+                            isDeleting={deletingId === item.id}
                         />
                     ) : null
                 ))}
