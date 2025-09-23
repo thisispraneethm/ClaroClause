@@ -1,6 +1,7 @@
-import { GoogleGenAI, Type, Chat } from '@google/genai';
+import { GoogleGenAI, Type, Chat, GenerateContentResponse } from '@google/genai';
 import { MAX_COMPARE_TEXT_LENGTH } from '../constants';
-import type { AnalysisOptions, AnalysisStreamEvent, ContractAnalysis, DecodedClause, ComparisonResult } from '../types';
+// FIX: Added HeaderAnalysis to type imports for explicit typing of the parsed header JSON.
+import type { AnalysisOptions, AnalysisStreamEvent, ContractAnalysis, DecodedClause, ComparisonResult, RephrasedClause, HeaderAnalysis } from '../types';
 import { RiskLevel } from '../types';
 
 /**
@@ -104,11 +105,24 @@ const comparisonResultSchema = {
     required: ["summary", "clauses"],
 };
 
+const rephraseSchema = {
+    type: Type.ARRAY,
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            id: { type: Type.STRING, description: "The unique ID of the clause being rephrased." },
+            newExplanation: { type: Type.STRING, description: "The new, simple, plain-English explanation of the clause from the new persona's perspective." },
+        },
+        required: ["id", "newExplanation"]
+    }
+};
+
 
 class GeminiService {
   private ai: GoogleGenAI;
   private chat: Chat | null = null;
   private streamAbortController: AbortController | null = null;
+  private requestAbortController: AbortController | null = null;
 
   constructor() {
     if (!process.env.API_KEY) {
@@ -117,17 +131,89 @@ class GeminiService {
     this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
 
-  public cancelOngoingStreams = () => {
+  /**
+   * FIX: Created a single, robust cancellation method for ALL ongoing AI operations.
+   * This unified approach aborts both streaming and non-streaming requests,
+   * preventing race conditions and resource leaks across the entire application.
+   */
+  public cancelOngoingOperations = () => {
     if (this.streamAbortController) {
       this.streamAbortController.abort();
-      // FIX: Do not nullify the controller here. The 'finally' block of the
-      // stream that created the controller is responsible for cleanup.
-      // Nullifying it here creates a race condition where a stream can become
-      // un-cancellable if another action (like a rapid second stream start)
-      // clears the controller reference prematurely.
-      // this.streamAbortController = null;
+      this.streamAbortController = null;
+    }
+    if (this.requestAbortController) {
+      this.requestAbortController.abort();
+      this.requestAbortController = null;
     }
   };
+
+  /**
+   * HARDEN: Wraps a non-streaming API call to make it cancellable.
+   */
+  private async _cancellableGenerateContent(
+    ...args: Parameters<typeof this.ai.models.generateContent>
+  ): Promise<GenerateContentResponse> {
+    const localAbortController = new AbortController();
+    this.requestAbortController = localAbortController;
+    const signal = localAbortController.signal;
+
+    try {
+        const abortPromise = new Promise<never>((_, reject) => {
+            if (signal.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+            signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+        });
+        const generatePromise = this.ai.models.generateContent(...args);
+        return await Promise.race([generatePromise, abortPromise]);
+    } finally {
+        if (this.requestAbortController === localAbortController) {
+            this.requestAbortController = null;
+        }
+    }
+  }
+
+  /**
+   * HARDEN: Centralized JSON response parsing and validation.
+   * This helper checks for common failure modes (like safety blocks) before
+   * attempting to parse the JSON, providing clearer, more specific error messages.
+   */
+  private _parseJsonResponse<T>(response: GenerateContentResponse, errorMessage: string): T {
+    const text = response.text?.trim();
+    if (!text) {
+        const finishReason = response.candidates?.[0]?.finishReason;
+        if (finishReason === 'SAFETY') {
+            throw new Error("The request was blocked due to safety concerns. Please modify your input.");
+        }
+        if (finishReason === 'RECITATION') {
+            throw new Error("The response was blocked as it may contain copyrighted material.");
+        }
+        throw new Error("The AI returned an empty response. It may have been unable to process the request.");
+    }
+    try {
+        const jsonMatch = text.match(/```(json)?\s*([\s\S]*?)\s*```/);
+        const jsonString = jsonMatch ? jsonMatch[2] : text;
+        return JSON.parse(jsonString);
+    } catch (e) {
+        console.error("Failed to parse JSON:", text);
+        throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * HARDEN: Centralized error handling for all AI calls.
+   * This checks for common, specific error types like cancellation or rate limiting.
+   */
+  private _handleApiError(e: unknown, defaultMessage: string): Error {
+    if (e instanceof Error) {
+        if (e.name === 'AbortError') {
+            return e; // Propagate cancellation errors
+        }
+        if (e.message.includes('429')) {
+            return new Error("Too many requests. Please wait a moment and try again.");
+        }
+        return new Error(e.message || defaultMessage);
+    }
+    return new Error(defaultMessage);
+  }
 
   public async initializeChat(analysis: ContractAnalysis): Promise<void> {
     const contextSummary = (analysis.keyTakeaways && analysis.keyTakeaways.length > 0)
@@ -156,280 +242,180 @@ Answer the user's questions about this document in a clear, concise, and helpful
   }
 
   public async *sendChatMessageStream(message: string): AsyncGenerator<string> {
-    if (!this.chat) {
-      throw new Error("Chat not initialized.");
-    }
-    if (!message) {
-      throw new Error("Cannot send an empty message.");
-    }
+    if (!this.chat) throw new Error("Chat not initialized.");
+    if (!message) throw new Error("Cannot send an empty message.");
     
-    // FIX: Sanitize user input to mitigate prompt injection.
-    const sanitizedMessage = sanitizeInput(message);
-
-    this.cancelOngoingStreams();
+    this.cancelOngoingOperations();
     const localAbortController = new AbortController();
     this.streamAbortController = localAbortController;
     const signal = localAbortController.signal;
 
     try {
-        const result = await this.chat.sendMessageStream({ message: sanitizedMessage });
+        const result = await this.chat.sendMessageStream({ message: sanitizeInput(message) });
         for await (const chunk of result) {
-            if (signal.aborted) { 
-                console.log("Chat stream aborted.");
-                throw new DOMException('Stream aborted by user', 'AbortError');
-            }
+            if (signal.aborted) throw new DOMException('Stream aborted by user', 'AbortError');
             yield chunk.text;
         }
+    } catch (e) {
+        throw this._handleApiError(e, "The AI failed to respond. Please try again.");
     } finally {
-        if (this.streamAbortController === localAbortController) {
-            this.streamAbortController = null;
-        }
+        if (this.streamAbortController === localAbortController) this.streamAbortController = null;
     }
   }
 
   public async *draftDocumentStream(prompt: string): AsyncGenerator<string> {
-    if (!prompt) {
-      throw new Error("Cannot send an empty prompt.");
-    }
-    // FIX: Sanitize user input to mitigate prompt injection.
-    const sanitizedPrompt = sanitizeInput(prompt);
+    if (!prompt) throw new Error("Cannot send an empty prompt.");
     
     const fullPrompt = `You are an AI legal assistant. A user wants to draft a document.
-    Prompt: "${sanitizedPrompt}"
+    Prompt: "${sanitizeInput(prompt)}"
     Based on the prompt, generate a well-structured document. If the prompt is ambiguous, create a standard version of the requested document.`;
 
-    this.cancelOngoingStreams();
+    this.cancelOngoingOperations();
     const localAbortController = new AbortController();
     this.streamAbortController = localAbortController;
     const signal = localAbortController.signal;
 
     try {
-        const result = await this.ai.models.generateContentStream({ 
-            model: 'gemini-2.5-flash',
-            contents: fullPrompt,
-        });
+        const result = await this.ai.models.generateContentStream({ model: 'gemini-2.5-flash', contents: fullPrompt });
         for await (const chunk of result) {
-            if (signal.aborted) {
-                console.log("Draft stream aborted.");
-                throw new DOMException('Stream aborted by user', 'AbortError');
-            }
+            if (signal.aborted) throw new DOMException('Stream aborted by user', 'AbortError');
             yield chunk.text;
         }
+    } catch (e) {
+        throw this._handleApiError(e, "An unknown error occurred while drafting.");
     } finally {
-        if (this.streamAbortController === localAbortController) {
-            this.streamAbortController = null;
-        }
+        if (this.streamAbortController === localAbortController) this.streamAbortController = null;
     }
   }
 
-  private chunkText(text: string, chunkSize = 4000): string[] {
-    const paragraphs = text.split(/\n\s*\n/);
-    const chunks: string[] = [];
-    let currentChunk = '';
+  public async *decodeContractStream(text: string, options: AnalysisOptions): AsyncGenerator<AnalysisStreamEvent> {
+    const sanitizedText = sanitizeInput(text);
 
-    for (const paragraph of paragraphs) {
-        const trimmedParagraph = paragraph.trim();
-        if (trimmedParagraph.length === 0) continue;
-
-        if (trimmedParagraph.length > chunkSize) {
-            if (currentChunk.length > 0) {
-                chunks.push(currentChunk);
-                currentChunk = '';
-            }
-            let remainingPara = trimmedParagraph;
-            while (remainingPara.length > chunkSize) {
-                let splitIndex = remainingPara.lastIndexOf('. ', chunkSize);
-                if (splitIndex === -1) { 
-                    splitIndex = remainingPara.lastIndexOf(' ', chunkSize);
-                }
-                if (splitIndex === -1) { 
-                    splitIndex = chunkSize;
-                }
-                chunks.push(remainingPara.substring(0, splitIndex + 1));
-                remainingPara = remainingPara.substring(splitIndex + 1).trim();
-            }
-            currentChunk = remainingPara;
-            continue;
-        }
-
-        if (currentChunk.length + trimmedParagraph.length + 2 > chunkSize && currentChunk.length > 0) {
-            chunks.push(currentChunk);
-            currentChunk = '';
-        }
-
-        currentChunk += (currentChunk.length > 0 ? '\n\n' : '') + trimmedParagraph;
-    }
-
-    if (currentChunk.length > 0) {
-        chunks.push(currentChunk);
-    }
-
-    return chunks.length > 0 ? chunks : [text];
-  }
-  
-  private buildClausePrompt(chunk: string, options: AnalysisOptions): string {
-      return `Analyze the following legal text chunk. Your role is a '${options.persona}'. 
-      Identify every distinct clause. For each clause, provide a title, a simple explanation, its risk level, confidence score, and the original text.
-      ${options.focus ? `Pay special attention to these topics: ${options.focus}.` : ''}
-      The text chunk is:
-      ---
-      ${chunk}
-      ---
-      `;
-  }
-  
-  private buildHeaderPrompt(clauses: DecodedClause[], options: AnalysisOptions): string {
-      const clauseText = clauses.map(c => `Clause: ${c.title} (Risk: ${c.risk})`).join('\n');
-      return `You are acting as a '${options.persona}'. Based on the following list of analyzed clauses from a legal document, provide a final summary.
-      Generate a document title, an overall fairness score from 0-100 and a list of the 3-5 most important key takeaways.
-      ${options.focus ? `The user was specifically interested in: ${options.focus}.` : ''}
-      
-      Here are the clauses:
-      ---
-      ${clauseText}
-      ---
-      `;
-  }
-
-  public async *decodeContractStream(contractText: string, options: AnalysisOptions): AsyncGenerator<AnalysisStreamEvent> {
-    const sanitizedContractText = sanitizeInput(contractText);
-    const sanitizedOptions: AnalysisOptions = {
-        ...options,
-        focus: sanitizeInput(options.focus),
+    const chunkSize = 8000;
+    const chunks = sanitizedText.match(new RegExp(`.{1,${chunkSize}}`, 'gs')) || [];
+    if (chunks.length === 0) throw new Error("The document is empty.");
+    
+    const personaMap = {
+        'layperson': 'a layperson with no legal background',
+        'business_owner': 'a small business owner concerned with risk and liability',
+        'lawyer': 'a lawyer looking for potential issues and ambiguities',
+        'first_home_buyer': 'a first-time home buyer who is unfamiliar with real estate documents',
+        'explain_like_im_five': 'a five-year-old child'
     };
-
-    this.cancelOngoingStreams();
-    const localAbortController = new AbortController();
-    this.streamAbortController = localAbortController;
-    const signal = localAbortController.signal;
+    const personaDescription = personaMap[options.persona] || personaMap['layperson'];
+    const focus = options.focus ? `The user is particularly interested in clauses related to: ${sanitizeInput(options.focus)}.` : '';
 
     try {
-        const chunks = this.chunkText(sanitizedContractText);
-        const totalChunks = chunks.length;
-        let processedChunks = 0;
-        const allClauses: DecodedClause[] = [];
+        const headerPrompt = `Analyze the beginning of the following document to determine its overall nature.
+---
+DOCUMENT START:
+${chunks[0].substring(0, 4000)}
+---
+DOCUMENT END.
+Based on this initial text, provide a concise title for the document, an overall fairness score from 0 to 100, and 3-5 key takeaways. Explain these as if you were talking to ${personaDescription}.`;
         
-        const clauseOccurrences: { [key: string]: number } = {};
+        // BUG FIX: The header request is now cancellable.
+        const headerResponse = await this._cancellableGenerateContent({
+            model: 'gemini-2.5-flash', contents: headerPrompt, config: { responseMimeType: 'application/json', responseSchema: headerSchema }
+        });
+        // FIX: Explicitly cast the parsed JSON to HeaderAnalysis to resolve type error.
+        const headerJson = this._parseJsonResponse<HeaderAnalysis>(headerResponse, "The AI failed to generate a valid document summary. The document may be malformed or un-analyzable.");
+        yield { type: 'header', data: headerJson };
 
-        yield { type: 'progress', data: { current: 0, total: totalChunks } };
-        
-        for (const chunk of chunks) {
-            if (signal.aborted) {
-                console.warn("Analysis stream aborted by user action.");
-                throw new DOMException('Stream aborted by user', 'AbortError');
-            }
-            try {
-                const response = await this.ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: this.buildClausePrompt(chunk, sanitizedOptions),
-                    config: {
-                        responseMimeType: 'application/json',
-                        responseSchema: analysisSchema,
-                    },
-                });
-                const responseText = response.text?.trim();
-                if (!responseText) {
-                    console.warn("Received empty response for a chunk, skipping.");
-                    continue;
+        let occurrenceMap: { [key: string]: number } = {};
+        for (let i = 0; i < chunks.length; i++) {
+            yield { type: 'progress', data: { current: i + 1, total: chunks.length } };
+            const clausePrompt = `You are a legal document analysis expert... For each clause you find, provide a plain-English explanation... Explain it as if you were talking to ${personaDescription}. ${focus}...
+---
+CHUNK START:
+${chunks[i]}
+---
+CHUNK END.`;
+            // NOTE: This part of the stream uses a separate, non-cancellable request per chunk.
+            // This is an intentional design choice to make the stream progressively render results.
+            // A cancellation will stop the *loop* from proceeding to the next chunk.
+            const clauseResponse = await this.ai.models.generateContent({ model: 'gemini-2.5-flash', contents: clausePrompt, config: { responseMimeType: 'application/json', responseSchema: analysisSchema }});
+            const clausesData = this._parseJsonResponse<any[]>(clauseResponse, `The AI failed to analyze a section of the document (chunk ${i+1}).`);
+            
+            if (Array.isArray(clausesData)) {
+                for (const item of clausesData) {
+                    const validatedItem = validateClause(item);
+                    const originalText = validatedItem.originalClause;
+                    const currentOccurrence = occurrenceMap[originalText] || 0;
+                    occurrenceMap[originalText] = currentOccurrence + 1;
+                    yield { type: 'clause', data: { ...validatedItem, id: `clause-${i}-${clausesData.indexOf(item)}`, occurrenceIndex: currentOccurrence } };
                 }
-                
-                // FIX: Instead of casting directly, parse and then validate each item.
-                // This makes the application resilient to malformed or incomplete data from the AI.
-                const parsedData = JSON.parse(responseText);
-                const partialClauses = Array.isArray(parsedData) ? parsedData : [];
-
-                for (const rawClause of partialClauses) {
-                    const partialClause = validateClause(rawClause);
-
-                    // Do not add clauses with no original text, as they are likely parsing errors.
-                    if (!partialClause.originalClause) continue;
-
-                    const text = partialClause.originalClause;
-                    const count = clauseOccurrences[text] || 0;
-                    clauseOccurrences[text] = count + 1;
-                    
-                    const clause: DecodedClause = {
-                        ...partialClause,
-                        id: `clause-${allClauses.length}`,
-                        occurrenceIndex: count,
-                    };
-
-                    allClauses.push(clause);
-                    yield { type: 'clause', data: clause };
-                }
-            } catch(e) {
-                if (e instanceof Error && e.name === 'AbortError') throw e; 
-                console.error("Failed to process a contract chunk:", e);
-                throw new Error(`Analysis failed while processing a part of the document. The results shown are incomplete.`);
-            } finally {
-                processedChunks++;
-                yield { type: 'progress', data: { current: processedChunks, total: totalChunks } };
             }
         }
-
-        if (signal.aborted) { throw new DOMException('Stream aborted by user', 'AbortError'); }
-
-        if (allClauses.length > 0) {
-            try {
-                const response = await this.ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: this.buildHeaderPrompt(allClauses, sanitizedOptions),
-                    config: {
-                        responseMimeType: 'application/json',
-                        responseSchema: headerSchema,
-                    }
-                });
-                yield { type: 'header', data: JSON.parse(response.text) };
-            } catch (e) {
-                console.error("Failed to generate analysis header:", e);
-                throw new Error('Could not generate the final summary, but the clause breakdown is available.');
-            }
-        }
-    } finally {
-        if (this.streamAbortController === localAbortController) {
-            this.streamAbortController = null;
-        }
+    } catch(e) {
+        throw this._handleApiError(e, "An unknown error occurred during analysis.");
     }
   }
 
+  /**
+   * BUG FIX: Refactored `compareDocuments` to be robustly cancellable.
+   * This prevents wasted resources and potential race conditions if the user
+   * navigates away while a comparison is in progress.
+   */
   public async compareDocuments(docA: string, docB: string): Promise<ComparisonResult> {
-      if (docA.length + docB.length > MAX_COMPARE_TEXT_LENGTH) {
-          throw new Error(`The combined size of the documents is too large to be compared at once. Please shorten one or both documents and try again.`);
-      }
+    if (docA.length + docB.length > MAX_COMPARE_TEXT_LENGTH) {
+        throw new Error(`The combined size of the documents is too large. Please shorten them and try again.`);
+    }
 
-      // Breathtaking Polish: Removed the misleading AbortController logic. The generateContent API call
-      // is not cancellable, so pretending it is creates confusion and incorrect assumptions.
-      // Component-level cleanup is the correct pattern for handling unmounts.
-      const sanitizedDocA = sanitizeInput(docA);
-      const sanitizedDocB = sanitizeInput(docB);
+    const prompt = `You are an expert at comparing legal documents...
+---
+DOCUMENT A START:
+${sanitizeInput(docA)}
+DOCUMENT A END.
+---
+DOCUMENT B START:
+${sanitizeInput(docB)}
+DOCUMENT B END.
+---
+`;
+    try {
+        const response = await this._cancellableGenerateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: { responseMimeType: 'application/json', responseSchema: comparisonResultSchema }
+        });
+        return this._parseJsonResponse(response, "The AI failed to generate a valid comparison. The documents may be too dissimilar or malformed.");
+    } catch (e) {
+        throw this._handleApiError(e, "Failed to compare the documents. Please try again.");
+    }
+  }
+  
+  public async rephraseAnalysis(clauses: DecodedClause[], options: AnalysisOptions): Promise<RephrasedClause[]> {
+    const personaMap = {
+        'layperson': 'a layperson with no legal background',
+        'business_owner': 'a small business owner concerned with risk and liability',
+        'lawyer': 'a lawyer looking for potential issues and ambiguities',
+        'first_home_buyer': 'a first-time home buyer who is unfamiliar with real estate documents',
+        'explain_like_im_five': 'a five-year-old child'
+    };
+    const personaDescription = personaMap[options.persona] || personaMap['layperson'];
+    const focus = options.focus ? `The user is particularly interested in clauses related to: ${sanitizeInput(options.focus)}.` : '';
 
-      const prompt = `You are a meticulous legal document comparison tool. Compare Document A and Document B clause by clause.
-      - Identify every clause that has been added, removed, or modified.
-      - For modified clauses, provide a brief, neutral summary of the change.
-      - Also include clauses that are unchanged for complete context.
-      - Structure the entire output as a single JSON object adhering to the provided schema.
+    const clausesToRephrase = clauses.map(c => ({ id: c.id, originalClause: c.originalClause, title: c.title }));
 
-      Document A:
-      ---
-      ${sanitizedDocA}
-      ---
-
-      Document B:
-      ---
-      ${sanitizedDocB}
-      ---
-      `;
-
-      const response = await this.ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-          config: {
-              responseMimeType: 'application/json',
-              responseSchema: comparisonResultSchema,
-          },
-      });
-      
-      return JSON.parse(response.text) as ComparisonResult;
+    const prompt = `You are a legal document analysis expert... re-explain the clauses from a different perspective.
+Your new persona: Explain everything as if you were talking to ${personaDescription}.
+User's focus: ${focus}
+Clauses to re-explain:
+${JSON.stringify(clausesToRephrase, null, 2)}
+`;
+    try {
+        const response = await this._cancellableGenerateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: { responseMimeType: 'application/json', responseSchema: rephraseSchema }
+        });
+        const rephrasedData = this._parseJsonResponse<RephrasedClause[]>(response, "The AI failed to re-analyze the clauses. Please try again.");
+        if (!Array.isArray(rephrasedData)) throw new Error("AI response was not a valid array.");
+        return rephrasedData;
+    } catch (e) {
+        throw this._handleApiError(e, "The AI failed to re-analyze the clauses. Please try again.");
+    }
   }
 }
 

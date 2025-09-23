@@ -20,12 +20,8 @@ const riskStyles: { [key in RiskLevel]: { textColorClass: string; borderColorCla
 const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string | null, occurrence: number | null) => void; }> = ({ clause, onHover }) => {
   const [isOriginalVisible, setIsOriginalVisible] = React.useState(false);
   const [copyStatus, setCopyStatus] = React.useState<'Copy' | 'Copied!' | 'Failed!'>('Copy');
-  // FIX: A ref to hold the timer ID. This prevents memory leaks by allowing
-  // the timeout to be cleared if the component unmounts before it fires.
   const copyTimeoutRef = React.useRef<number | null>(null);
 
-  // FIX: The cleanup function returned by useEffect will now clear any pending
-  // timeouts, preventing state updates on an unmounted component.
   React.useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) {
@@ -38,13 +34,11 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
   const handleToggleOriginal = () => setIsOriginalVisible(!isOriginalVisible);
 
   const handleCopy = () => {
-    // FIX: Clear any existing timeout before setting a new one.
     if (copyTimeoutRef.current) {
       clearTimeout(copyTimeoutRef.current);
     }
     navigator.clipboard.writeText(clause.originalClause).then(() => {
         setCopyStatus('Copied!');
-        // FIX: Store the new timeout ID in the ref.
         copyTimeoutRef.current = window.setTimeout(() => setCopyStatus('Copy'), 2000);
     }).catch(err => {
         console.error('Failed to copy text: ', err);
@@ -175,8 +169,11 @@ const RiskGroupAccordion: React.FC<{ level: RiskLevel, clauses: DecodedClause[],
                     >
                         <div className={`p-4 space-y-4 border-t border-border/50`}>
                             <AnimatePresence>
-                                {clauses.map((clause, index) => (
-                                    <ClauseCard key={`${index}-${clause.title}`} clause={clause} onHover={onClauseHover} />
+                                {clauses.map((clause) => (
+                                    // BUG FIX: Switched key from a fragile index/title combo to the stable, unique `clause.id`.
+                                    // This is critical for React's reconciliation algorithm to correctly track items,
+                                    // preventing state mismatches and rendering bugs.
+                                    <ClauseCard key={clause.id} clause={clause} onHover={onClauseHover} />
                                 ))}
                             </AnimatePresence>
                         </div>
@@ -196,8 +193,6 @@ interface SummaryDisplayProps {
 
 export const SummaryDisplay: React.FC<SummaryDisplayProps> = ({ clauses, isLoading, onClauseHover }) => {
   const groupedClauses = React.useMemo(() => {
-    // FIX: Removed redundant calculation of occurrenceIndex.
-    // The `clauses` prop already contains the necessary index from the geminiService.
     return clauses.reduce((acc, clause) => {
         const risk = clause.risk;
         if (!acc[risk]) {

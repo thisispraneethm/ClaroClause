@@ -21,7 +21,17 @@ interface DocumentInputProps {
 
 const DocumentInput: React.FC<DocumentInputProps> = ({ title, value, onChange, onClear, onError, disabled }) => {
     const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
     const [isReadingFile, setIsReadingFile] = React.useState(false);
+
+    // UX FIX: Auto-resize textarea height based on content.
+    React.useEffect(() => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = `${textarea.scrollHeight}px`;
+        }
+    }, [value]);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -61,6 +71,7 @@ const DocumentInput: React.FC<DocumentInputProps> = ({ title, value, onChange, o
             <h3 className="font-semibold text-center mb-3">{title}</h3>
             <div className="relative flex-1">
                 <textarea
+                    ref={textareaRef}
                     value={value}
                     onChange={handleTextAreaChange}
                     placeholder={`Paste document text here...`}
@@ -98,12 +109,14 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
         setDocA(initialDocument);
     }, [initialDocument]);
     
-    // FIX: Use a ref to track mount status. This prevents state updates on unmounted
-    // components if the user navigates away during a long API call.
     React.useEffect(() => {
         isMounted.current = true;
         return () => {
             isMounted.current = false;
+            // BUG FIX: The "compare" operation is now cancellable.
+            // This prevents the API request from continuing in the background
+            // if the user navigates away, saving resources and preventing errors.
+            geminiService.cancelOngoingOperations();
         };
     }, []);
 
@@ -122,7 +135,7 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
             }
         } catch (err) {
             console.error(err);
-            if (isMounted.current) {
+            if (isMounted.current && !(err instanceof DOMException && err.name === 'AbortError')) {
                 setError(err instanceof Error ? err.message : 'Failed to compare the documents. Please try again.');
             }
         } finally {
@@ -163,14 +176,14 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
                       See what’s changed between two versions of a document.
                     </p>
                 </div>
-                {initialDocument && (
+                {initialDocument && !docA && (
                     <div className="text-center my-4">
                         <button onClick={() => setDocA(initialDocument)} className="flex items-center gap-2 mx-auto px-4 py-2 text-sm font-medium rounded-full transition-colors bg-secondary/50 hover:bg-secondary border border-border">
                             <DocumentTextIcon className="w-4 h-4" /> Load current document into Document A
                         </button>
                     </div>
                 )}
-                <div className="mt-6 w-full max-w-6xl mx-auto flex flex-col md:flex-row gap-6 min-h-[400px]">
+                <div className="mt-6 w-full max-w-6xl mx-auto flex flex-col md:flex-row gap-6 md:h-[60vh]">
                     <DocumentInput title="Document A" value={docA} onChange={setDocA} onClear={() => setDocA('')} onError={setError} disabled={isLoading} />
                     <DocumentInput title="Document B" value={docB} onChange={setDocB} onClear={() => setDocB('')} onError={setError} disabled={isLoading} />
                 </div>
@@ -199,9 +212,13 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
                 </div>
             </AnimatePresence>
             {error && (
-                <div className="mt-8 text-center text-destructive-foreground bg-destructive/80 p-4 rounded-lg w-full max-w-4xl animate-fade-in">
+                <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-8 text-center text-destructive-foreground bg-destructive/20 border border-destructive/30 p-4 rounded-lg w-full max-w-4xl"
+                >
                     <p>{error}</p>
-                </div>
+                </motion.div>
             )}
         </div>
     );

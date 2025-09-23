@@ -16,7 +16,19 @@ interface ContractInputProps {
 
 export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, onFileSelect, onDecode, isLoading, onError, onClear }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const [isReadingFile, setIsReadingFile] = React.useState(false);
+
+  // UX FIX: Auto-resize textarea height based on content.
+  React.useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+        textarea.style.height = 'auto'; // Reset height
+        // Set height to scroll height, but not exceeding the max-height
+        const newHeight = Math.min(textarea.scrollHeight, parseFloat(getComputedStyle(textarea).maxHeight));
+        textarea.style.height = `${newHeight}px`;
+    }
+  }, [value]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -85,10 +97,11 @@ export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, o
       )}
       <textarea
         id="contract-input"
+        ref={textareaRef}
         value={value}
         onChange={handleInputChange}
         placeholder="Paste your contract, terms of service, or policy text here, or upload a file..."
-        className="w-full h-80 p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner"
+        className="w-full p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner min-h-[20rem] max-h-[60vh]"
         disabled={isDisabled}
       />
       <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">

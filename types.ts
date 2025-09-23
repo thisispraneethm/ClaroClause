@@ -87,3 +87,9 @@ export interface ComparisonResult {
     };
     clauses: ComparedClause[];
 }
+
+// --- Re-analysis Types ---
+export interface RephrasedClause {
+    id: string;
+    newExplanation: string;
+}

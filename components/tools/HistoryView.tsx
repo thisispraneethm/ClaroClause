@@ -4,22 +4,29 @@ import type { PersistedAnalysis } from '../../services/dbService';
 import { HistoryIcon } from '../icons/HistoryIcon';
 import { XIcon } from '../icons/XIcon';
 import { ClipboardListIcon } from '../icons/ClipboardListIcon';
+import { Trash2Icon } from '../icons/Trash2Icon';
 import { RiskLevel } from '../../types';
 
 interface HistoryViewProps {
   history: PersistedAnalysis[];
   onLoad: (item: PersistedAnalysis) => void;
   onDelete: (id: number) => void;
+  onClearAll: () => void;
   deletingId: number | null;
 }
 
+/**
+ * PERFORMANCE FIX: The date formatter is now created once at the module level.
+ * This prevents the expensive `new Intl.DateTimeFormat()` constructor from being
+ * called on every single render for every item in the history list, significantly
+ * improving rendering performance.
+ */
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+});
+
 const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDelete: () => void; isDeleting: boolean; }> = ({ item, onLoad, onDelete, isDeleting }) => {
-    const formatDate = (date: Date) => {
-        return new Intl.DateTimeFormat('en-US', {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-        }).format(date);
-    };
 
     const riskCounts = React.useMemo(() => {
         return item.analysis.clauses.reduce((acc, clause) => {
@@ -63,7 +70,7 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
                         {item.documentTitle || 'Untitled Document'}
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                        Analyzed on {formatDate(item.createdAt)}
+                        Analyzed on {dateFormatter.format(item.createdAt)}
                     </p>
                     {totalClauses > 0 && (
                       <div className="mt-3 w-full h-2 flex rounded-full overflow-hidden bg-secondary" title="Risk profile">
@@ -96,17 +103,36 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
     );
 };
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ history, onLoad, onDelete, deletingId }) => {
-  return (
+export const HistoryView: React.FC<HistoryViewProps> = ({ history, onLoad, onDelete, onClearAll, deletingId }) => {
+    
+    const handleClearAll = () => {
+        if (window.confirm('Are you sure you want to permanently delete all analysis history? This action cannot be undone.')) {
+            onClearAll();
+        }
+    }
+    
+    return (
     <div className="max-w-4xl mx-auto p-6 md:p-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: 'easeOut' }}
       >
-        <div className="flex items-center gap-3 mb-6">
-          <HistoryIcon className="w-8 h-8 text-primary" />
-          <h1 className="text-4xl font-bold font-serif">Analysis History</h1>
+        <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <HistoryIcon className="w-8 h-8 text-primary" />
+              <h1 className="text-4xl font-bold font-serif">Analysis History</h1>
+            </div>
+            {history.length > 0 && (
+                <button 
+                    onClick={handleClearAll}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full text-destructive-foreground bg-destructive/20 border border-destructive/30 hover:bg-destructive/30 transition-colors"
+                    aria-label="Clear all analysis history"
+                >
+                    <Trash2Icon className="w-4 h-4"/>
+                    Clear All
+                </button>
+            )}
         </div>
 
         {history.length === 0 ? (

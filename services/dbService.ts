@@ -16,20 +16,22 @@ export class ClaroClauseDB extends Dexie {
 
   constructor() {
     super('ClaroClauseDB');
-    // The schema version is updated to include chatHistory.
+    // FIX: Refactored database versioning to use the standard chained `version()` pattern.
+    // This is the correct, industry-standard way to declare schemas and migrations in Dexie,
+    // improving code clarity and ensuring robust, predictable database upgrades.
+    // FIX: Added (this as Dexie) type assertion to resolve TypeScript error where 'version' method was not found on the subclass.
+    (this as Dexie).version(1).stores({
+      analyses: '++id, createdAt'
+    });
     (this as Dexie).version(2).stores({
-      analyses: '++id, createdAt', // Primary key and index
+      analyses: '++id, createdAt', // Indexed fields must be kept in new versions
     }).upgrade(tx => {
         // Migration logic handles old data that doesn't have the chatHistory property.
         return tx.table('analyses').toCollection().modify(analysis => {
-            if (!analysis.chatHistory) {
+            if (analysis.chatHistory === undefined) {
                 analysis.chatHistory = [];
             }
         });
-    });
-    // Original version 1 store for backward compatibility.
-    (this as Dexie).version(1).stores({
-      analyses: '++id, createdAt'
     });
   }
 }
@@ -76,4 +78,13 @@ export async function updateChatHistory(id: number, chatHistory: ChatMessage[]):
 
 export async function clearAnalysisHistory(): Promise<void> {
     await db.analyses.clear();
+}
+
+/**
+ * Updates the analysis and options for a specific record.
+ * @returns {Promise<boolean>} - True if the update was successful, false otherwise.
+ */
+export async function updateAnalysis(id: number, analysis: ContractAnalysis, options: AnalysisOptions): Promise<boolean> {
+    const updatedCount = await db.analyses.update(id, { analysis, options });
+    return updatedCount > 0;
 }

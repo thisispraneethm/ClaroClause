@@ -1,7 +1,7 @@
 import React, { useLayoutEffect } from 'react';
-import type { ContractAnalysis, ChatMessage, AnalysisOptions, DecodedClause } from './types';
+import type { ContractAnalysis, ChatMessage, AnalysisOptions, DecodedClause, AnalysisPersona, RephrasedClause } from './types';
 import { geminiService } from './services/geminiService';
-import { getLatestAnalysis, saveAnalysis, getAllAnalyses, deleteAnalysis, PersistedAnalysis, updateChatHistory } from './services/dbService';
+import { getLatestAnalysis, saveAnalysis, getAllAnalyses, deleteAnalysis, PersistedAnalysis, updateChatHistory, clearAnalysisHistory, updateAnalysis } from './services/dbService';
 import { Sidebar } from './components/Sidebar';
 import { AnalyzeView } from './components/tools/AnalyzeView';
 import { ChatView } from './components/tools/ChatView';
@@ -24,6 +24,7 @@ interface AppState {
   chatHistory: ChatMessage[];
   analysisOptions: AnalysisOptions | null;
   isLoading: boolean;
+  isRephrasing: boolean; // For persona re-analysis
   error: string | null;
   isDocumentLoaded: boolean;
   isChatReady: boolean;
@@ -35,6 +36,7 @@ interface AppState {
   citedClause: { text: string; occurrence: number } | null;
   progress: { current: number; total: number } | null;
   deletingId: number | null;
+  prepopulatedChatMessage: string | null;
 }
 
 type AppAction =
@@ -62,9 +64,15 @@ type AppAction =
   | { type: 'RESET_ACTIVE_ANALYSIS' }
   | { type: 'DELETE_ANALYSIS_START'; payload: number }
   | { type: 'DELETE_ANALYSIS_FINISH' }
+  | { type: 'HISTORY_CLEARED' }
   | { type: 'ANALYSIS_DELETED_EXTERNALLY' }
   | { type: 'SET_CITED_CLAUSE'; payload: { text: string; occurrence: number } | null }
-  | { type: 'CLEAR_ERROR' };
+  | { type: 'CLEAR_ERROR' }
+  | { type: 'PREPOPULATE_CHAT_MESSAGE'; payload: string }
+  | { type: 'CLEAR_PREPOPULATED_CHAT_MESSAGE' }
+  | { type: 'REPHRASE_START' }
+  | { type: 'REPHRASE_SUCCESS'; payload: { rephrasedClauses: RephrasedClause[]; newOptions: AnalysisOptions } }
+  | { type: 'REPHRASE_FAILURE'; payload: string };
 
 const initialState: AppState = {
   activeTool: 'home',
@@ -73,6 +81,7 @@ const initialState: AppState = {
   chatHistory: [],
   analysisOptions: null,
   isLoading: false,
+  isRephrasing: false,
   error: null,
   isDocumentLoaded: false,
   isChatReady: false,
@@ -84,22 +93,17 @@ const initialState: AppState = {
   citedClause: null,
   progress: null,
   deletingId: null,
+  prepopulatedChatMessage: null,
 };
 
-function appReducer(state: AppState, action: AppAction): AppState {
-  switch (action.type) {
-    case 'SET_TOOL':
-      // FIX: Cancel any ongoing AI streams when the user switches tools.
-      // This prevents "zombie" processes, resource leaks, and state corruption
-      // from background tasks affecting the wrong view.
-      geminiService.cancelOngoingStreams();
-      // When navigating away from a citation, clear it.
-      return { ...state, activeTool: action.payload, error: null, citedClause: null };
-    case 'SET_HISTORY':
-      return { ...state, history: action.payload };
-    case 'HYDRATE_STATE': {
-      const persisted = action.payload;
-      return {
+
+/**
+ * FIX: Created a shared helper function to load analysis data into state.
+ * This removes code duplication between the `HYDRATE_STATE` and `LOAD_ANALYSIS`
+ * actions, ensuring consistent state transitions and improving maintainability.
+ */
+function loadAnalysisIntoState(state: AppState, persisted: PersistedAnalysis): AppState {
+    return {
         ...state,
         contractText: persisted.contractText,
         analysis: persisted.analysis,
@@ -107,10 +111,33 @@ function appReducer(state: AppState, action: AppAction): AppState {
         chatHistory: persisted.chatHistory || [],
         currentAnalysisId: persisted.id,
         isDocumentLoaded: true,
+        isChatReady: false, // Will re-init
+        error: null,
+    };
+}
+
+
+function appReducer(state: AppState, action: AppAction): AppState {
+  switch (action.type) {
+    case 'SET_TOOL':
+      // FIX: Cancel any ongoing AI operations (streams, requests) when the user switches tools.
+      // This prevents "zombie" processes, resource leaks, and state corruption.
+      geminiService.cancelOngoingOperations();
+      return { 
+        ...state, 
+        activeTool: action.payload, 
+        error: null, 
+        citedClause: null,
+        // BUG FIX: Clear pre-populated chat message when navigating away from the chat tool.
+        prepopulatedChatMessage: action.payload === 'chat' ? state.prepopulatedChatMessage : null
       };
+    case 'SET_HISTORY':
+      return { ...state, history: action.payload };
+    case 'HYDRATE_STATE': {
+      return loadAnalysisIntoState(state, action.payload);
     }
     case 'START_NEW':
-      geminiService.cancelOngoingStreams();
+      geminiService.cancelOngoingOperations();
       return {
         ...state,
         contractText: '',
@@ -123,18 +150,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
         isChatReady: false,
       };
     case 'LOAD_ANALYSIS': {
-      geminiService.cancelOngoingStreams();
-      const item = action.payload;
+      geminiService.cancelOngoingOperations();
       return {
-        ...state,
-        contractText: item.contractText,
-        analysis: item.analysis,
-        analysisOptions: item.options,
-        chatHistory: item.chatHistory || [],
-        currentAnalysisId: item.id,
-        isDocumentLoaded: true,
-        isChatReady: false,
-        error: null,
+        ...loadAnalysisIntoState(state, action.payload),
         activeTool: 'analyze',
       };
     }
@@ -143,8 +161,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'ACCEPT_DISCLAIMER':
       return { ...state, showDisclaimer: false, analysisPending: null };
     case 'CLOSE_DISCLAIMER':
-      // FIX: Clear the pending analysis state when the disclaimer is dismissed,
-      // preventing stale state from persisting.
       return { ...state, showDisclaimer: false, analysisPending: null };
     case 'ANALYSIS_START':
       return {
@@ -160,15 +176,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
         isChatReady: false,
       };
     case 'SET_CONTRACT_TEXT': {
-        // BUG FIX: When text is modified on a loaded document, it becomes a "new"
-        // document. Reset analysis and chat state to prevent inconsistency where
-        // the chat context refers to a different document than the one displayed.
         const isModifyingLoadedDoc = state.isDocumentLoaded;
         return {
             ...state,
             contractText: action.payload,
             error: null,
-            // If they had a document loaded, changing the text invalidates it.
             analysis: isModifyingLoadedDoc ? null : state.analysis,
             chatHistory: isModifyingLoadedDoc ? [] : state.chatHistory,
             isDocumentLoaded: isModifyingLoadedDoc ? false : state.isDocumentLoaded,
@@ -198,9 +210,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'CHAT_INIT_FAILURE':
       return { ...state, isChatReady: false, error: action.payload };
     case 'SEND_CHAT_MESSAGE': {
-      // FIX: Filter out any previous, incomplete AI message bubbles.
-      // This handles the case where a user sends a new message while the AI is still "typing",
-      // preventing a stuck typing indicator from the cancelled stream.
       const cleanedHistory = state.chatHistory.filter(
         (msg) => !(msg.sender === 'ai' && msg.text === '' && !msg.error)
       );
@@ -211,7 +220,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
     case 'RETRY_CHAT_MESSAGE': {
-      // Filter out the previous AI error message before retrying.
       const cleanedHistory = state.chatHistory.filter(msg => !msg.error);
       return {
         ...state,
@@ -237,7 +245,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'FINISH_CHAT_STREAM':
       return { ...state, isAiTyping: false };
     case 'RESET_ACTIVE_ANALYSIS':
-        geminiService.cancelOngoingStreams();
+        geminiService.cancelOngoingOperations();
         return {
             ...state,
             contractText: '',
@@ -246,7 +254,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
             isDocumentLoaded: false,
             error: null,
             currentAnalysisId: undefined,
-            // Keep the user on the history page to see the result of their action
             activeTool: 'history',
             isChatReady: false,
         };
@@ -254,9 +261,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, deletingId: action.payload };
     case 'DELETE_ANALYSIS_FINISH':
       return { ...state, deletingId: null };
+    case 'HISTORY_CLEARED':
+      return {
+        ...state,
+        history: [],
+        contractText: '',
+        analysis: null,
+        chatHistory: [],
+        isDocumentLoaded: false,
+        error: null,
+        currentAnalysisId: undefined,
+        activeTool: 'history',
+        isChatReady: false,
+      };
     case 'ANALYSIS_DELETED_EXTERNALLY':
-        // FIX: Handle the case where the active analysis was deleted (e.g., in another tab).
-        // This provides clear feedback to the user and prevents silent failures.
         return {
             ...state,
             contractText: '',
@@ -270,6 +288,30 @@ function appReducer(state: AppState, action: AppAction): AppState {
         };
     case 'SET_CITED_CLAUSE':
       return { ...state, citedClause: action.payload, activeTool: 'analyze' };
+    case 'PREPOPULATE_CHAT_MESSAGE':
+        return { ...state, prepopulatedChatMessage: action.payload, activeTool: 'chat' };
+    case 'CLEAR_PREPOPULATED_CHAT_MESSAGE':
+        return { ...state, prepopulatedChatMessage: null };
+    case 'REPHRASE_START':
+      return { ...state, isRephrasing: true, error: null };
+    case 'REPHRASE_SUCCESS':
+      if (!state.analysis) return state;
+      const { rephrasedClauses, newOptions } = action.payload;
+      const updatedClauses = state.analysis.clauses.map(originalClause => {
+          const updated = rephrasedClauses.find(rc => rc.id === originalClause.id);
+          return updated ? { ...originalClause, explanation: updated.newExplanation } : originalClause;
+      });
+      return {
+          ...state,
+          isRephrasing: false,
+          analysisOptions: newOptions,
+          analysis: {
+              ...state.analysis,
+              clauses: updatedClauses,
+          },
+      };
+    case 'REPHRASE_FAILURE':
+        return { ...state, isRephrasing: false, error: action.payload };
     default:
       return state;
   }
@@ -280,23 +322,13 @@ const App: React.FC = () => {
   const mainContentRef = React.useRef<HTMLDivElement>(null);
   const historyScrollPos = React.useRef(0);
 
-  /**
-   * BUG FIX: Preserves the scroll position of the History view.
-   * This effect saves the scroll position when navigating away from the history tool
-   * and restores it upon returning, preventing the jarring UX of the list resetting to the top.
-   */
   useLayoutEffect(() => {
     const mainEl = mainContentRef.current;
     if (state.activeTool === 'history' && mainEl) {
-        // When navigating TO history, restore scroll position.
         mainEl.scrollTop = historyScrollPos.current;
     }
-
-    // The cleanup function runs when the effect's dependency changes,
-    // capturing the state from its render scope.
     return () => {
         if (state.activeTool === 'history' && mainEl) {
-            // When navigating AWAY from history, save scroll position.
             historyScrollPos.current = mainEl.scrollTop;
         }
     }
@@ -307,11 +339,6 @@ const App: React.FC = () => {
     dispatch({ type: 'SET_HISTORY', payload: allAnalyses });
   };
 
-  /**
-   * FIX: Extracted chat initialization into a retryable, memoized function.
-   * This prevents re-running the initialization on every render and allows the
-   * ChatView to offer a "retry" option if the initial connection fails.
-   */
   const handleInitializeChat = React.useCallback(async () => {
     if (state.isDocumentLoaded && state.analysis) {
         try {
@@ -343,8 +370,6 @@ const App: React.FC = () => {
   }, [state.isDocumentLoaded, state.analysis, handleInitializeChat]);
 
   const handleAcceptDisclaimer = () => {
-    // FIX: Wrap localStorage access in a try-catch to prevent crashes in
-    // environments where it's disabled (e.g., private browsing).
     try {
       localStorage.setItem('disclaimerAccepted', 'true');
     } catch (e) {
@@ -387,11 +412,6 @@ const App: React.FC = () => {
         }
       }
 
-      /**
-       * BUG FIX: Handle silent failure when no clauses are found.
-       * If the AI returns no clauses, the application now throws a user-friendly
-       * error instead of showing a confusing, empty results screen.
-       */
       if (tempAnalysis.clauses.length === 0) {
         throw new Error("No clauses could be identified in the provided document. Please check the document's formatting or try analyzing a different text.");
       }
@@ -408,10 +428,6 @@ const App: React.FC = () => {
     }
   };
 
-  /**
-   * FIX: Refactored chat streaming logic into a single helper to avoid code duplication.
-   * This handles the core logic for sending a message and processing the AI's response stream.
-   */
   const _streamAiResponse = async (message: string, aiMessageId: string) => {
       try {
         let fullResponse = '';
@@ -423,7 +439,7 @@ const App: React.FC = () => {
         console.error("Chat failed:", e);
         if (e instanceof Error && e.name === 'AbortError') {
           console.log("Chat stream was cancelled.");
-          return; // Don't show an error if it was a user-initiated cancellation.
+          return;
         }
         const errorText = e instanceof Error ? e.message : 'The AI failed to respond. Please try again.';
         dispatch({ type: 'CHAT_RESPONSE_FAILURE', payload: { id: aiMessageId, error: errorText, originalMessage: message } });
@@ -449,13 +465,11 @@ const App: React.FC = () => {
     await _streamAiResponse(originalMessage, aiMessageId);
   };
   
-   // Persist chat history whenever it changes, but not while AI is typing.
   React.useEffect(() => {
     if (!state.currentAnalysisId || state.isAiTyping || state.chatHistory.length === 0) {
         return;
     }
     
-    // Ensure we don't save during initial hydration or loading.
     const lastMessage = state.chatHistory[state.chatHistory.length - 1];
     if (lastMessage.sender === 'ai' && lastMessage.text === '' && !lastMessage.error) {
         return;
@@ -463,8 +477,6 @@ const App: React.FC = () => {
 
     const persistHistory = async () => {
         const success = await updateChatHistory(state.currentAnalysisId!, state.chatHistory);
-        // FIX: Handle race condition where the analysis was deleted in another tab.
-        // If the update fails, it means the record is gone, so we should reset the view.
         if (!success) {
             console.warn(`Analysis ID ${state.currentAnalysisId} could not be updated. It may have been deleted.`);
             dispatch({ type: 'ANALYSIS_DELETED_EXTERNALLY' });
@@ -475,7 +487,6 @@ const App: React.FC = () => {
   }, [state.chatHistory, state.isAiTyping, state.currentAnalysisId]);
 
   const handleDeleteAnalysis = async (id: number) => {
-    // BUG FIX: Prevent concurrent delete operations by checking the deletingId state.
     if (state.deletingId !== null) return;
 
     dispatch({ type: 'DELETE_ANALYSIS_START', payload: id });
@@ -492,11 +503,54 @@ const App: React.FC = () => {
     }
   };
 
+  const handleClearAllHistory = async () => {
+    await clearAnalysisHistory();
+    dispatch({ type: 'HISTORY_CLEARED' });
+  };
+
   const handleClauseCitationClick = (clauseId: string) => {
     if (!state.analysis) return;
     const clauseToCite = state.analysis.clauses.find(c => c.id === clauseId);
     if (clauseToCite) {
       dispatch({ type: 'SET_CITED_CLAUSE', payload: { text: clauseToCite.originalClause, occurrence: clauseToCite.occurrenceIndex } });
+    }
+  };
+
+  const handleAskAboutClause = (clauseText: string) => {
+    const snippet = clauseText.length > 150 ? clauseText.substring(0, 150) + '...' : clauseText;
+    const prompt = `Can you explain this clause in more detail: "${snippet}"?`;
+    dispatch({ type: 'PREPOPULATE_CHAT_MESSAGE', payload: prompt });
+  };
+
+  const handleRephrase = async (newPersona: AnalysisPersona) => {
+    if (!state.analysis || !state.analysisOptions || !state.currentAnalysisId) return;
+
+    dispatch({ type: 'REPHRASE_START' });
+    const newOptions: AnalysisOptions = { ...state.analysisOptions, persona: newPersona };
+    try {
+        const rephrasedClauses = await geminiService.rephraseAnalysis(state.analysis.clauses, newOptions);
+        
+        dispatch({ type: 'REPHRASE_SUCCESS', payload: { rephrasedClauses, newOptions }});
+
+        const currentAnalysis = state.analysis;
+        const updatedClauses = currentAnalysis.clauses.map(originalClause => {
+            const updated = rephrasedClauses.find(rc => rc.id === originalClause.id);
+            return updated ? { ...originalClause, explanation: updated.newExplanation } : originalClause;
+        });
+        const updatedAnalysis: ContractAnalysis = { ...currentAnalysis, clauses: updatedClauses };
+
+        await updateAnalysis(state.currentAnalysisId, updatedAnalysis, newOptions);
+        await loadHistory();
+
+    } catch(e) {
+        if (e instanceof Error && e.name === 'AbortError') {
+            console.log("Rephrase was cancelled.");
+            // Reset state gracefully without showing an error to the user for cancellation.
+            dispatch({ type: 'REPHRASE_FAILURE', payload: '' });
+            return;
+        }
+        const message = e instanceof Error ? e.message : 'An unknown error occurred while re-analyzing.';
+        dispatch({ type: 'REPHRASE_FAILURE', payload: message });
     }
   };
 
@@ -511,6 +565,7 @@ const App: React.FC = () => {
           contractText={state.contractText}
           setContractText={(text) => dispatch({ type: 'SET_CONTRACT_TEXT', payload: text })}
           isLoading={state.isLoading}
+          isRephrasing={state.isRephrasing}
           error={state.error}
           onStartNew={() => dispatch({ type: 'START_NEW' })}
           progress={state.progress}
@@ -518,6 +573,8 @@ const App: React.FC = () => {
           citedClause={state.citedClause}
           onSetError={(message) => dispatch({ type: 'ANALYSIS_FAILURE', payload: message })}
           onClearError={() => dispatch({ type: 'CLEAR_ERROR' })}
+          onAskAboutClause={handleAskAboutClause}
+          onRephrase={handleRephrase}
         />;
       case 'chat':
         return state.isDocumentLoaded ?
@@ -529,6 +586,8 @@ const App: React.FC = () => {
             onClauseClick={handleClauseCitationClick}
             isChatReady={state.isChatReady}
             onRetryInit={handleInitializeChat}
+            prepopulatedMessage={state.prepopulatedChatMessage}
+            onClearPrepopulatedMessage={() => dispatch({ type: 'CLEAR_PREPOPULATED_CHAT_MESSAGE' })}
           /> : <HomeView onStartAnalysis={() => dispatch({ type: 'SET_TOOL', payload: 'analyze' })} />;
       case 'compare':
         return <CompareView initialDocument={state.contractText} />
@@ -539,6 +598,7 @@ const App: React.FC = () => {
           history={state.history}
           onLoad={(item) => dispatch({ type: 'LOAD_ANALYSIS', payload: item })}
           onDelete={handleDeleteAnalysis}
+          onClearAll={handleClearAllHistory}
           deletingId={state.deletingId}
         />
       default:

@@ -7,10 +7,14 @@ import { ThemeProvider } from './contexts/ThemeContext';
 // Catches application-wide errors (e.g., missing API key) 
 // to prevent the entire application from crashing to a blank screen.
 class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
+  React.PropsWithChildren,
   { hasError: boolean; error: Error | null }
 > {
-  constructor(props: { children: React.ReactNode }) {
+  // FIX: Reverted to using a constructor for state initialization. The modern class
+  // property syntax was causing a TypeScript error where `this.props` was not
+  // recognized in the render method. This constructor pattern correctly
+  // initializes the component and resolves the type error.
+  constructor(props: React.PropsWithChildren) {
     super(props);
     this.state = { hasError: false, error: null };
   }

@@ -13,6 +13,8 @@ interface ChatViewProps {
   onClauseClick: (clauseId: string) => void;
   isChatReady: boolean;
   onRetryInit: () => void;
+  prepopulatedMessage: string | null;
+  onClearPrepopulatedMessage: () => void;
 }
 
 const AiTypingIndicator: React.FC = () => (
@@ -36,7 +38,6 @@ const AiTypingIndicator: React.FC = () => (
 );
 
 const ParsedMessage: React.FC<{ text: string; onClauseClick: (clauseId: string) => void }> = React.memo(({ text, onClauseClick }) => {
-    // Parses the robust citation format `[Citation: clause-ID]`.
     const parts = text.split(/(\[Citation: [a-zA-Z0-9-]+?\])/g);
     
     return (
@@ -45,7 +46,6 @@ const ParsedMessage: React.FC<{ text: string; onClauseClick: (clauseId: string) 
                 const match = part.match(/\[Citation: ([a-zA-Z0-9-]+?)\]/);
                 if (match) {
                     const clauseId = match[1];
-                    // The text displayed to the user can be a simplified version.
                     const userFriendlyText = `Clause ${clauseId.split('-')[1]}`;
                     return (
                         <button
@@ -144,11 +144,6 @@ const EmptyState: React.FC<{ onSendMessage: (msg: string) => void }> = ({ onSend
     );
 };
 
-/**
- * FIX: Added a dedicated error state for when the chat assistant fails to initialize.
- * This provides clear feedback to the user and a path to recovery, fixing a UX
- * dead-end where the chat would silently fail.
- */
 const InitErrorState: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
     <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in p-4">
         <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
@@ -170,26 +165,44 @@ const InitErrorState: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
 );
 
 
-export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, onRetryMessage, isAiTyping, onClauseClick, isChatReady, onRetryInit }) => {
+export const ChatView: React.FC<ChatViewProps> = ({ chatHistory, onSendMessage, onRetryMessage, isAiTyping, onClauseClick, isChatReady, onRetryInit, prepopulatedMessage, onClearPrepopulatedMessage }) => {
   const [input, setInput] = React.useState('');
   const chatEndRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const chatContainerRef = React.useRef<HTMLUListElement>(null);
+  const prevHistoryLength = React.useRef(chatHistory.length);
 
+
+  React.useEffect(() => {
+    if (prepopulatedMessage) {
+      setInput(prepopulatedMessage);
+      onClearPrepopulatedMessage();
+      textareaRef.current?.focus();
+    }
+  }, [prepopulatedMessage, onClearPrepopulatedMessage]);
+
+  /**
+   * BUG FIX: Hardened the auto-scroll logic.
+   * This effect now correctly identifies when the user sends a new message and
+   * forces a scroll to the bottom, ensuring their own message is always visible.
+   * For incoming AI messages, it preserves the existing behavior of only
+   * auto-scrolling if the user is already near the bottom.
+   */
   React.useEffect(() => {
     const container = chatContainerRef.current;
     if (container) {
       const scrollThreshold = 100;
       const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < scrollThreshold;
+      const userJustSentMessage = chatHistory.length > prevHistoryLength.current && chatHistory[chatHistory.length - 1]?.sender === 'user';
       
-      if (isNearBottom) {
+      if (isNearBottom || userJustSentMessage) {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }
     }
-  }, [chatHistory, isAiTyping]);
+    prevHistoryLength.current = chatHistory.length;
+  }, [chatHistory]);
 
   React.useEffect(() => {
-    // Automatically focus the input when the chat first becomes ready for a new conversation.
     if (isChatReady && chatHistory.length === 0) {
       textareaRef.current?.focus();
     }

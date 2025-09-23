@@ -1,5 +1,5 @@
-import React from 'react';
-import type { ContractAnalysis, AnalysisOptions } from '../../types';
+import React, { useLayoutEffect, useState, useRef } from 'react';
+import type { ContractAnalysis, AnalysisOptions, AnalysisPersona } from '../../types';
 import { ContractInput } from '../ContractInput';
 import { ExampleContracts } from '../ExampleContracts';
 import { SummaryHeader } from '../SummaryHeader';
@@ -11,6 +11,8 @@ import { XIcon } from '../icons/XIcon';
 import { InfoIcon } from '../icons/InfoIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ClipboardListIcon } from '../icons/ClipboardListIcon';
+import { MessageSquarePlusIcon } from '../icons/MessageSquarePlusIcon';
+import { PersonaSelector } from '../PersonaSelector';
 
 interface AnalyzeViewProps {
   onAnalyze: (text: string, options: AnalysisOptions) => void;
@@ -18,6 +20,7 @@ interface AnalyzeViewProps {
   contractText: string;
   setContractText: (text: string) => void;
   isLoading: boolean;
+  isRephrasing: boolean;
   error: string | null;
   onStartNew: () => void;
   progress: { current: number; total: number } | null;
@@ -25,11 +28,12 @@ interface AnalyzeViewProps {
   citedClause: { text: string; occurrence: number } | null;
   onSetError: (message: string) => void;
   onClearError: () => void;
+  onAskAboutClause: (clauseText: string) => void;
+  onRephrase: (newPersona: AnalysisPersona) => void;
 }
 
 type AnalysisStep = 'input' | 'enhance' | 'processing';
 
-// A custom hook to debounce a value.
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = React.useState<T>(value);
   React.useEffect(() => {
@@ -44,7 +48,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 // Trust Pillar 1: Verifiability - This component highlights text for citations.
-const HighlightableText: React.FC<{ text: string, highlight: { text: string; occurrence: number } | null }> = React.memo(({ text, highlight }) => {
+const HighlightableText: React.FC<{ text: string, highlight: { text: string; occurrence: number } | null }> = ({ text, highlight }) => {
     if (!highlight || !highlight.text || !text.includes(highlight.text)) {
         return <>{text}</>;
     }
@@ -80,14 +84,29 @@ const HighlightableText: React.FC<{ text: string, highlight: { text: string; occ
     }
 
     return <>{parts}</>;
+};
+
+/**
+ * BUG FIX: Correctly memoized the `HighlightableText` component.
+ * By providing a custom equality check function to `React.memo`, we ensure the component
+ * only re-renders when the actual text or highlight content changes. This prevents
+ * costly re-renders of the entire document on every mouse movement, fixing a major
+ * performance bottleneck.
+ */
+const MemoizedHighlightableText = React.memo(HighlightableText, (prevProps, nextProps) => {
+    if (prevProps.text !== nextProps.text) return false;
+    if (prevProps.highlight?.text !== nextProps.highlight?.text) return false;
+    if (prevProps.highlight?.occurrence !== nextProps.highlight?.occurrence) return false;
+    return true;
 });
 
 
-export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, contractText, setContractText, isLoading, error, onStartNew, progress, analysisOptions, citedClause, onSetError, onClearError }) => {
+export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, contractText, setContractText, isLoading, isRephrasing, error, onStartNew, progress, analysisOptions, citedClause, onSetError, onClearError, onAskAboutClause, onRephrase }) => {
   const [step, setStep] = React.useState<AnalysisStep>('input');
   const [hoveredClause, setHoveredClause] = React.useState<{ text: string | null, occurrence: number | null }>({ text: null, occurrence: null });
   const debouncedHoveredClause = useDebounce(hoveredClause, 300);
   const documentContainerRef = React.useRef<HTMLDivElement>(null);
+  const [askButtonPosition, setAskButtonPosition] = useState<{ top: number; right: number } | null>(null);
   
   const [currentAnalysisOptions, setCurrentAnalysisOptions] = React.useState<AnalysisOptions>(
       analysisOptions || { persona: 'layperson', focus: '' }
@@ -136,8 +155,8 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
     }
   }, [analysis, isLoading]);
 
-  React.useEffect(() => {
-    if ((debouncedHoveredClause.text || citedClause) && documentContainerRef.current) {
+  useLayoutEffect(() => {
+    if (highlightTarget.text && documentContainerRef.current) {
         const container = documentContainerRef.current;
         const markElement = container.querySelector('mark');
         if (markElement) {
@@ -145,9 +164,19 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
                 behavior: 'smooth',
                 block: 'center',
             });
+            const containerRect = container.getBoundingClientRect();
+            const markRect = markElement.getBoundingClientRect();
+            setAskButtonPosition({
+                top: markRect.top - containerRect.top + container.scrollTop,
+                right: container.clientWidth - (markRect.right - containerRect.left) + 8,
+            });
+        } else {
+            setAskButtonPosition(null);
         }
+    } else {
+        setAskButtonPosition(null);
     }
-  }, [debouncedHoveredClause, citedClause]);
+  }, [highlightTarget]);
 
   if (analysis) {
     return (
@@ -157,7 +186,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
                 <div className="flex items-start pr-8">
                     <InfoIcon className="w-5 h-5 mr-3 text-destructive flex-shrink-0 mt-0.5" />
                     <div>
-                        <h4 className="font-semibold">Analysis Incomplete</h4>
+                        <h4 className="font-semibold">Analysis Error</h4>
                         <p className="mt-1 opacity-90">{error}</p>
                     </div>
                 </div>
@@ -167,7 +196,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
             </div>
            )}
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 overflow-hidden">
-              <div className="flex flex-col overflow-hidden glass-panel rounded-xl">
+              <div className="flex flex-col overflow-hidden glass-panel rounded-xl relative">
                   <div className="flex items-center justify-between p-3 border-b border-border flex-shrink-0">
                       <h2 className="text-sm font-semibold text-foreground truncate pr-4">{analysis.documentTitle}</h2>
                        <button 
@@ -178,11 +207,30 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
                          Analyze New
                        </button>
                   </div>
-                  <div ref={documentContainerRef} className="p-4 text-sm text-muted-foreground overflow-y-auto font-mono whitespace-pre-wrap flex-1 bg-background/50">
-                      <HighlightableText text={contractText} highlight={highlightTarget} />
+                  <div ref={documentContainerRef} className="p-4 text-sm text-muted-foreground overflow-y-auto font-mono whitespace-pre-wrap flex-1 bg-background/50 relative">
+                      <MemoizedHighlightableText text={contractText} highlight={highlightTarget} />
                   </div>
+
+                  <AnimatePresence>
+                    {askButtonPosition && highlightTarget.text && (
+                        <motion.button
+                            onClick={() => onAskAboutClause(highlightTarget.text!)}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                            className="absolute z-20 flex items-center gap-1.5 px-2 py-1 text-xs rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/80 transition-transform hover:scale-105"
+                            style={{ top: askButtonPosition.top, right: askButtonPosition.right }}
+                            aria-label="Ask about this clause"
+                        >
+                            <MessageSquarePlusIcon className="w-3.5 h-3.5" />
+                            Ask
+                        </motion.button>
+                    )}
+                  </AnimatePresence>
               </div>
               <div className="overflow-y-auto pr-1">
+                 {analysisOptions && <PersonaSelector currentPersona={analysisOptions.persona} onPersonaChange={onRephrase} isRephrasing={isRephrasing}/>}
                  {analysis.keyTakeaways.length > 0 && <SummaryHeader analysis={analysis} />}
                  <SummaryDisplay 
                     clauses={analysis.clauses} 

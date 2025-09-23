@@ -19,10 +19,10 @@ export const DraftView: React.FC = () => {
 
   React.useEffect(() => {
     isMounted.current = true;
-    // Cleanup function runs when the component unmounts.
     return () => {
       isMounted.current = false;
-      geminiService.cancelOngoingStreams();
+      // FIX: Use the unified cancellation method to ensure any active draft stream is stopped.
+      geminiService.cancelOngoingOperations();
       if (copyTimeoutRef.current) {
         clearTimeout(copyTimeoutRef.current);
       }
@@ -75,7 +75,6 @@ export const DraftView: React.FC = () => {
     });
   };
 
-  // Auto-resize the prompt textarea.
   React.useEffect(() => {
     const textarea = promptTextareaRef.current;
     if (textarea) {
@@ -84,7 +83,6 @@ export const DraftView: React.FC = () => {
     }
   }, [prompt]);
   
-  // Auto-resize the result textarea as content streams in or is edited by the user.
   React.useEffect(() => {
     const textarea = resultTextareaRef.current;
     if (textarea) {
