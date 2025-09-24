@@ -119,7 +119,7 @@ export const DraftView: React.FC = () => {
             <button
               onClick={handleDraft}
               disabled={isDrafting || !prompt.trim()}
-              className="group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring shadow-lg shadow-primary/30"
+              className="group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-primary hover:scale-105 active:scale-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring shadow-lg shadow-primary-glow"
             >
               <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shine" />
               <span className="relative flex items-center gap-2">
@@ -132,7 +132,7 @@ export const DraftView: React.FC = () => {
       </div>
 
       {error && (
-        <div className="mt-8 text-center text-destructive-foreground bg-destructive/20 p-4 rounded-lg w-full max-w-4xl animate-fade-in border border-destructive/30">
+        <div className="mt-8 text-center text-destructive bg-destructive/10 p-4 rounded-lg w-full max-w-4xl animate-fade-in border border-destructive/20">
           <p>{error}</p>
         </div>
       )}
@@ -150,7 +150,7 @@ export const DraftView: React.FC = () => {
               {hasResult && (
                 <button
                   onClick={handleCopy}
-                  className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground bg-secondary/50 hover:bg-secondary hover:text-foreground transition-all duration-200"
+                  className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground bg-secondary hover:text-foreground transition-all duration-200"
                 >
                   {copyStatus === 'Copied!' ? <CheckCircleIcon className="w-3.5 h-3.5 text-risk-low" /> : <CopyIcon className="w-3.5 h-3.5" />}
                   <span>{copyStatus}</span>

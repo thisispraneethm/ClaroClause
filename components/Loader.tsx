@@ -1,14 +1,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { DocumentTextIcon } from './icons/DocumentTextIcon';
-import { SearchCodeIcon } from './icons/SearchCodeIcon';
 
 const loadingMessages = [
   'Translating legalese into plain English...',
-  'Checking the fine print...',
+  'Checking the fine print for hidden risks...',
   'Consulting with our digital legal expert...',
-  'Simplifying complex clauses...',
-  'Analyzing document structure...'
+  'Simplifying complex clauses and structures...',
+  'Analyzing document intent and implications...',
+  'Cross-referencing legal patterns...',
+  'Decoding contractual obligations...',
 ];
 
 interface LoaderProps {
@@ -17,6 +17,45 @@ interface LoaderProps {
         total: number;
     } | null
 }
+
+const DecodingMatrix: React.FC = () => {
+    return (
+        <div className="relative w-24 h-24">
+            {/* Base Grid */}
+            <div className="absolute inset-0 grid grid-cols-4 gap-2">
+                {[...Array(16)].map((_, i) => (
+                    <motion.div
+                        key={i}
+                        className="bg-primary/10 rounded-sm"
+                        initial={{ opacity: 0.5 }}
+                        animate={{ opacity: [0.1, 0.5, 0.1] }}
+                        transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            delay: Math.random() * 2,
+                            ease: 'easeInOut'
+                        }}
+                    />
+                ))}
+            </div>
+            {/* Scanner */}
+             <motion.div
+                className="absolute inset-0"
+                style={{
+                    background: 'linear-gradient(to bottom, transparent 0%, rgba(var(--primary-rgb), 0.5) 50%, transparent 100%)',
+                    boxShadow: '0 0 10px rgba(var(--primary-rgb), 0.7)',
+                    filter: 'blur(2px)'
+                }}
+                animate={{ y: ['-100%', '100%'] }}
+                transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: 'linear'
+                }}
+            />
+        </div>
+    );
+};
 
 export const Loader: React.FC<LoaderProps> = ({ progress }) => {
   const [messageIndex, setMessageIndex] = React.useState(0);
@@ -34,30 +73,17 @@ export const Loader: React.FC<LoaderProps> = ({ progress }) => {
 
 
   return (
-    <div className="flex flex-col items-center justify-center space-y-6 my-12 animate-fade-in w-full max-w-md mx-auto">
-        {/* 
-          Breathtaking: The loader icon is now a subtle, elegant pulse, enhancing the feel of a sophisticated process.
-        */}
-        <div className="relative w-20 h-20">
-            <DocumentTextIcon className="w-full h-full text-muted-foreground/30" />
-            <motion.div
-                className="absolute inset-0 flex items-center justify-center"
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ duration: 2.5, ease: "easeInOut", repeat: Infinity }}
-            >
-                <SearchCodeIcon className="w-10 h-10 text-primary" />
-            </motion.div>
-        </div>
-
+    <div className="flex flex-col items-center justify-center space-y-8 my-12 animate-fade-in w-full max-w-md mx-auto">
+        <DecodingMatrix />
       <div className="w-full text-center">
         <p className="text-foreground text-center font-semibold">{progressText}</p>
         <p className="text-muted-foreground text-center transition-opacity duration-500 text-sm h-5">{loadingMessages[messageIndex]}</p>
       </div>
 
       {progress && (
-        <div className="w-full bg-secondary/50 rounded-full h-2.5 overflow-hidden shadow-inner">
+        <div className="w-full bg-secondary/50 rounded-full h-1.5 overflow-hidden shadow-inner relative">
             <motion.div 
-                className="bg-primary h-2.5 rounded-full" 
+                className="bg-primary h-full rounded-full" 
                 initial={{ width: '0%' }}
                 animate={{ width: `${progressPercentage}%` }}
                 transition={{ duration: 0.5, ease: 'easeInOut' }}

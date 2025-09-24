@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { PersistedAnalysis } from '../../services/dbService';
 import { HistoryIcon } from '../icons/HistoryIcon';
 import { XIcon } from '../icons/XIcon';
-import { ClipboardListIcon } from '../icons/ClipboardListIcon';
 import { Trash2Icon } from '../icons/Trash2Icon';
 import { RiskLevel } from '../../types';
 
@@ -63,17 +62,17 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
                 onClick={onLoad}
                 disabled={isDeleting}
                 aria-label={`Load analysis for ${item.documentTitle || 'Untitled Document'}`}
-                className="w-full text-left glass-panel p-4 rounded-xl flex items-center justify-between transition-all duration-200 hover:bg-white/5 hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:transform-none"
+                className="w-full text-left glass-panel p-4 rounded-xl flex items-center justify-between transition-all duration-200 hover:bg-card/80 hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:transform-none group"
             >
                 <div className="flex-1 overflow-hidden">
-                    <h3 className="font-semibold truncate pr-2 text-card-foreground" title={item.documentTitle}>
+                    <h3 className="font-semibold truncate pr-2 text-card-foreground group-hover:text-primary transition-colors" title={item.documentTitle}>
                         {item.documentTitle || 'Untitled Document'}
                     </h3>
                     <p className="text-xs text-muted-foreground">
                         Analyzed on {dateFormatter.format(item.createdAt)}
                     </p>
                     {totalClauses > 0 && (
-                      <div className="mt-3 w-full h-2 flex rounded-full overflow-hidden bg-secondary" title="Risk profile">
+                      <div className="mt-3 w-full h-1.5 flex rounded-full overflow-hidden bg-secondary" title="Risk profile">
                         {riskItems.map(risk => {
                           const count = riskCounts[risk.level] || 0;
                           if (count === 0) return null;
@@ -89,12 +88,12 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
                         disabled={isDeleting}
                         title="Delete Analysis"
                         aria-label={`Delete analysis for ${item.documentTitle || 'Untitled Document'}`}
-                        className="w-9 h-9 flex items-center justify-center rounded-full text-muted-foreground hover:bg-red-500/20 hover:text-red-400 transition-colors z-10 disabled:cursor-not-allowed"
+                        className="w-9 h-9 flex items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/20 hover:text-destructive transition-colors z-10 disabled:cursor-not-allowed"
                     >
                         {isDeleting ? (
                             <div className="w-4 h-4 rounded-full animate-spin border-2 border-dashed border-destructive border-t-transparent"></div>
                         ) : (
-                            <XIcon className="w-4 h-4" />
+                            <Trash2Icon className="w-4 h-4" />
                         )}
                     </button>
                 </div>
@@ -118,9 +117,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onLoad, onDel
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: 'easeOut' }}
       >
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
-              <HistoryIcon className="w-8 h-8 text-primary" />
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
+                <HistoryIcon className="w-6 h-6 text-primary" />
+              </div>
               <h1 className="text-4xl font-bold font-serif">Analysis History</h1>
             </div>
             {history.length > 0 && (
@@ -137,10 +138,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onLoad, onDel
 
         {history.length === 0 ? (
           <div className="text-center glass-panel p-8 rounded-lg mt-10">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4 border border-primary/20">
                 <HistoryIcon className="w-8 h-8 text-primary" />
             </div>
-            <h2 className="text-2xl font-semibold">No History Found</h2>
+            <h2 className="text-2xl font-semibold font-serif">No History Found</h2>
             <p className="text-muted-foreground mt-2">
               Your past document analyses will appear here.
             </p>
@@ -149,7 +150,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onLoad, onDel
           <motion.div 
             className="space-y-4"
             variants={{
-              visible: { transition: { staggerChildren: 0.1 } }
+              visible: { transition: { staggerChildren: 0.05 } }
             }}
             initial="hidden"
             animate="visible"

@@ -84,7 +84,7 @@ export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, o
   const isDisabled = isLoading || isReadingFile;
 
   return (
-    <div className="glass-panel p-6 rounded-3xl">
+    <div className="glass-panel p-6 rounded-3xl relative">
       <label htmlFor="contract-input" className="sr-only">Paste your contract, terms of service, or policy text here...</label>
       {hasValue && !isDisabled && (
         <button 
@@ -100,8 +100,8 @@ export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, o
         ref={textareaRef}
         value={value}
         onChange={handleInputChange}
-        placeholder="Paste your contract, terms of service, or policy text here, or upload a file..."
-        className="w-full p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner min-h-[20rem] max-h-[60vh]"
+        placeholder="Paste your contract, terms of service, or policy text here..."
+        className="w-full p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner min-h-[16rem] max-h-[50vh]"
         disabled={isDisabled}
       />
       <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -126,7 +126,7 @@ export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, o
         <button
           onClick={onDecode}
           disabled={isDisabled || !hasValue}
-          className={`group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring shadow-lg shadow-primary/30 ${hasValue && !isLoading ? 'animate-subtle-pulse' : ''}`}
+          className={`group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-primary hover:scale-105 active:scale-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring shadow-lg shadow-primary-glow ${hasValue && !isLoading ? 'animate-subtle-pulse' : ''}`}
         >
           <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shine" />
           <span className="relative flex items-center gap-2">

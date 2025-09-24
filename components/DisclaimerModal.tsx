@@ -49,7 +49,7 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ isOpen, onAcce
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-            className="glass-panel p-8 max-w-lg w-full relative rounded-2xl"
+            className="glass-panel p-8 max-w-lg w-full relative rounded-2xl border border-border/50"
             onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
             role="dialog"
             aria-modal="true"
@@ -63,7 +63,9 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ isOpen, onAcce
               <XIcon className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-3">
-              <InfoIcon className="w-6 h-6 text-primary" />
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
+                <InfoIcon className="w-5 h-5 text-primary" />
+              </div>
               <h2 id="disclaimer-title" className="text-2xl font-bold font-serif">Before You Proceed</h2>
             </div>
             <p className="mt-4 text-muted-foreground">

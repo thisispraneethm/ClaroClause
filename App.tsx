@@ -623,20 +623,20 @@ const App: React.FC = () => {
           <AnimatePresence mode="wait">
             <motion.div
               key={state.activeTool}
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ opacity: 0, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, filter: 'blur(4px)' }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
               className="h-full"
             >
               {renderTool()}
             </motion.div>
           </AnimatePresence>
         </main>
-        <footer className="flex-shrink-0 p-2 text-center text-xs text-muted-foreground border-t border-border bg-background/50 backdrop-blur-sm">
+        <footer className="flex-shrink-0 p-3 text-center text-xs text-muted-foreground border-t border-border bg-background/50">
             <div className="flex items-center justify-center gap-2 max-w-4xl mx-auto">
                 <LockIcon className="w-3 h-3 flex-shrink-0" />
-                <span>BETA RELEASE. Your documents are processed and stored locally in your browser. They are never uploaded to our servers.</span>
+                <span>BETA RELEASE. Your documents are processed and stored locally. They are never uploaded.</span>
             </div>
         </footer>
       </div>

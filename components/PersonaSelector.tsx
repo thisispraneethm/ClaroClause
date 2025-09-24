@@ -23,7 +23,7 @@ export const PersonaSelector: React.FC<PersonaSelectorProps> = ({ currentPersona
                 <div className="flex items-center gap-2">
                     <BrainCircuitIcon className="w-5 h-5 text-primary" />
                     <label htmlFor="persona-select" className="text-sm font-semibold text-card-foreground">
-                        Change AI Persona
+                        Change AI Perspective
                     </label>
                 </div>
                 {isRephrasing ? (

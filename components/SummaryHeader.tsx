@@ -25,18 +25,18 @@ const ScoreCircle: React.FC<{ score: number }> = ({ score }) => {
   const circumference = 2 * Math.PI * 46;
 
   let colorClass = 'text-risk-low';
-  let gradientFrom = '#34d399'; // risk-low
-  let gradientTo = '#a7f3d0';
+  let gradientFrom = 'rgb(var(--risk-low-rgb))';
+  let gradientTo = 'rgba(var(--risk-low-rgb), 0.5)';
 
   if (score < 75) {
       colorClass = 'text-risk-medium';
-      gradientFrom = '#fbbf24'; // risk-medium
-      gradientTo = '#fde68a';
+      gradientFrom = 'rgb(var(--risk-medium-rgb))';
+      gradientTo = 'rgba(var(--risk-medium-rgb), 0.5)';
   }
   if (score < 50) {
       colorClass = 'text-risk-high';
-      gradientFrom = '#f87171'; // risk-high
-      gradientTo = '#fca5a5';
+      gradientFrom = 'rgb(var(--risk-high-rgb))';
+      gradientTo = 'rgba(var(--risk-high-rgb), 0.5)';
   }
   
   const progressSpring = useSpring(0, { stiffness: 30, damping: 20, restDelta: 0.001 });
@@ -49,7 +49,7 @@ const ScoreCircle: React.FC<{ score: number }> = ({ score }) => {
   const uniqueGradientId = React.useId();
 
   return (
-    <div className="relative w-32 h-32">
+    <div className="relative w-36 h-36">
       <svg className="w-full h-full" viewBox="0 0 100 100">
         <defs>
           <linearGradient id={uniqueGradientId} x1="0" y1="0" x2="1" y2="1">
@@ -59,8 +59,8 @@ const ScoreCircle: React.FC<{ score: number }> = ({ score }) => {
         </defs>
         {/* Background circle */}
         <circle
-          className="text-border"
-          strokeWidth="8"
+          className="text-border/50"
+          strokeWidth="6"
           stroke="currentColor"
           fill="transparent"
           r="46"
@@ -69,7 +69,7 @@ const ScoreCircle: React.FC<{ score: number }> = ({ score }) => {
         />
         {/* Progress circle */}
         <motion.circle
-          strokeWidth="8"
+          strokeWidth="6"
           strokeDasharray={circumference}
           strokeLinecap="round"
           stroke={`url(#${uniqueGradientId})`}
@@ -82,7 +82,7 @@ const ScoreCircle: React.FC<{ score: number }> = ({ score }) => {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`text-4xl font-bold font-serif ${colorClass}`}>
+        <span className={`text-5xl font-bold font-serif ${colorClass}`}>
             <AnimatedNumber value={score} />
         </span>
         <span className="text-xs text-muted-foreground mt-1">Fairness Score</span>
@@ -130,9 +130,9 @@ ${analysis.keyTakeaways.map(t => `- ${t}`).join('\n')}
     };
 
     const riskItems = [
-        { level: RiskLevel.Low, color: 'bg-risk-low', label: 'Low Risk' },
-        { level: RiskLevel.Medium, color: 'bg-risk-medium', label: 'Medium Risk' },
         { level: RiskLevel.High, color: 'bg-risk-high', label: 'High Risk' },
+        { level: RiskLevel.Medium, color: 'bg-risk-medium', label: 'Medium Risk' },
+        { level: RiskLevel.Low, color: 'bg-risk-low', label: 'Low Risk' },
     ];
 
     return (
@@ -156,10 +156,10 @@ ${analysis.keyTakeaways.map(t => `- ${t}`).join('\n')}
                 </div>
                 <div className="md:col-span-2 md:pl-4">
                     <div className="flex justify-between items-start mb-4">
-                        <h2 className="text-2xl font-bold text-card-foreground font-serif">Key Takeaways</h2>
+                        <h2 className="text-3xl font-bold text-card-foreground font-serif">Key Takeaways</h2>
                         <button
                             onClick={handleCopySummary}
-                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground bg-secondary/50 hover:bg-secondary hover:text-foreground transition-all duration-200"
+                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground bg-secondary hover:text-foreground transition-all duration-200"
                         >
                             {copyStatus === 'Copied!' ? <CheckCircleIcon className="w-3.5 h-3.5 text-risk-low" /> : <CopyIcon className="w-3.5 h-3.5" />}
                             <span>{copyStatus} Summary</span>
@@ -172,9 +172,11 @@ ${analysis.keyTakeaways.map(t => `- ${t}`).join('\n')}
                                 className="flex items-start"
                                 initial={{ opacity: 0, x: -10 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.3, delay: index * 0.15 }}
+                                transition={{ duration: 0.3, delay: index * 0.15, ease: 'easeOut' }}
                             >
-                                <InfoIcon className="w-4 h-4 text-primary mt-1 mr-3 flex-shrink-0" />
+                                <div className="w-5 h-5 flex-shrink-0 mt-0.5 mr-3 rounded-full bg-primary/20 flex items-center justify-center">
+                                  <InfoIcon className="w-3 h-3 text-primary" />
+                                </div>
                                 <span className="text-muted-foreground leading-relaxed">{takeaway}</span>
                             </motion.li>
                         ))}

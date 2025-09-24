@@ -10,11 +10,11 @@ import { ShieldAlertIcon } from './icons/ShieldAlertIcon';
 import { HelpCircleIcon } from './icons/HelpCircleIcon';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 
-const riskStyles: { [key in RiskLevel]: { textColorClass: string; borderColorClass: string; icon: React.FC<React.SVGProps<SVGSVGElement>> } } = {
-  [RiskLevel.High]: { textColorClass: 'text-risk-high', borderColorClass: 'border-risk-high', icon: ShieldAlertIcon },
-  [RiskLevel.Medium]: { textColorClass: 'text-risk-medium', borderColorClass: 'border-risk-medium', icon: InfoIcon },
-  [RiskLevel.Low]: { textColorClass: 'text-risk-low', borderColorClass: 'border-risk-low', icon: CheckCircleIcon },
-  [RiskLevel.Unknown]: { textColorClass: 'text-muted-foreground', borderColorClass: 'border-muted', icon: InfoIcon },
+const riskStyles: { [key in RiskLevel]: { textColorClass: string; bgColorClass: string; icon: React.FC<React.SVGProps<SVGSVGElement>>; shadowClass: string; } } = {
+  [RiskLevel.High]: { textColorClass: 'text-risk-high', bgColorClass: 'bg-risk-high', icon: ShieldAlertIcon, shadowClass: 'hover:shadow-risk-high-glow' },
+  [RiskLevel.Medium]: { textColorClass: 'text-risk-medium', bgColorClass: 'bg-risk-medium', icon: InfoIcon, shadowClass: 'hover:shadow-risk-medium-glow' },
+  [RiskLevel.Low]: { textColorClass: 'text-risk-low', bgColorClass: 'bg-risk-low', icon: CheckCircleIcon, shadowClass: 'hover:shadow-risk-low-glow' },
+  [RiskLevel.Unknown]: { textColorClass: 'text-muted-foreground', bgColorClass: 'bg-muted', icon: InfoIcon, shadowClass: 'hover:shadow-glass' },
 };
 
 const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string | null, occurrence: number | null) => void; }> = ({ clause, onHover }) => {
@@ -48,7 +48,6 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
   };
 
   const riskStyle = riskStyles[clause.risk];
-  const highRiskGlow = clause.risk === RiskLevel.High ? 'shadow-lg shadow-risk-high/10' : '';
 
   return (
     <motion.div 
@@ -59,19 +58,20 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, transition: { duration: 0.2 } }}
       transition={{ layout: { duration: 0.4, type: "spring" }, opacity: { duration: 0.4, ease: 'easeOut' } }}
-      whileHover={{ y: -5, scale: 1.01, boxShadow: '0px 10px 40px -10px rgba(var(--primary-rgb), 0.3)' }}
+      whileHover={{ y: -4, scale: 1.01 }}
+      className={`glass-panel rounded-2xl overflow-hidden transition-shadow duration-300 ${riskStyle.shadowClass}`}
     >
-      <div
-        className={`glass-panel border-l-4 ${riskStyle.borderColorClass} rounded-r-xl rounded-b-xl backdrop-blur-sm transition-shadow duration-300 ${highRiskGlow} overflow-hidden`}
-      >
         <div className="p-5">
           <div className="flex justify-between items-start gap-4">
-            <h3 className="text-lg font-semibold text-card-foreground flex-1 pr-2">{clause.title}</h3>
+            <div className="flex items-start gap-3">
+              <div className={`mt-1.5 w-2 h-2 rounded-full ${riskStyle.bgColorClass} flex-shrink-0`}></div>
+              <h3 className="text-lg font-semibold text-card-foreground flex-1">{clause.title}</h3>
+            </div>
             <div className="flex items-center gap-2 flex-shrink-0">
                {clause.confidence === 'Low' && (
                  <div className="relative group">
                   <HelpCircleIcon className="h-4 w-4 text-risk-medium" />
-                  <span className="absolute bottom-full mb-2 w-48 left-1/2 -translate-x-1/2 p-2 text-xs font-semibold text-primary-foreground bg-slate-800/80 backdrop-blur-sm border border-border rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                  <span className="absolute bottom-full mb-2 w-48 left-1/2 -translate-x-1/2 p-2 text-xs font-semibold text-primary-foreground bg-slate-900/80 backdrop-blur-sm border border-border rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
                       AI confidence is low. The original text may be ambiguous or complex.
                   </span>
                  </div>
@@ -82,18 +82,15 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
                   Good to Know
                 </span>
               )}
-              <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${riskStyle.textColorClass} bg-background`}>
-                {clause.risk} Risk
-              </span>
             </div>
           </div>
-          <p className="mt-3 text-muted-foreground leading-relaxed">{clause.explanation}</p>
+          <p className="mt-3 pl-5 text-muted-foreground leading-relaxed">{clause.explanation}</p>
         </div>
         
-        <div className="border-t border-border/50 bg-white/5 px-5 py-3 flex items-center justify-start gap-4 text-sm">
+        <div className="bg-card/30 px-5 py-2 flex items-center justify-start gap-4 text-sm">
           <button onClick={handleToggleOriginal} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200">
             <DocumentTextIcon className="h-4 w-4" />
-            <span>Original Text</span>
+            <span>Original Clause</span>
             <ChevronDownIcon className={`h-4 w-4 transition-transform duration-300 ${isOriginalVisible ? 'rotate-180' : ''}`} />
           </button>
         </div>
@@ -109,21 +106,20 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
             >
               <div className="bg-background/50 p-4 border-t border-border/50">
                   <div className="flex justify-between items-center mb-2">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Original Clause</h4>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Source Text</h4>
                       <button 
                           onClick={handleCopy}
-                          className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md text-muted-foreground bg-secondary/50 hover:bg-secondary hover:text-foreground transition-all duration-200"
+                          className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md text-muted-foreground bg-secondary hover:text-foreground transition-all duration-200"
                       >
                           {copyStatus === 'Copied!' ? <CheckCircleIcon className="w-3.5 h-3.5 text-risk-low" /> : <CopyIcon className="w-3.5 h-3.5" />}
                           <span>{copyStatus}</span>
                       </button>
                   </div>
-                <p className="text-sm text-muted-foreground font-mono whitespace-pre-wrap break-words">{clause.originalClause}</p>
+                <p className="text-sm text-muted-foreground/80 font-mono whitespace-pre-wrap break-words">{clause.originalClause}</p>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
     </motion.div>
   );
 };
@@ -137,19 +133,26 @@ const RiskGroupAccordion: React.FC<{ level: RiskLevel, clauses: DecodedClause[],
     if (!clauses || clauses.length === 0) return null;
 
     return (
-        <motion.div layout className="glass-panel rounded-xl overflow-hidden">
+        <motion.div layout className="glass-panel rounded-xl overflow-hidden border border-border/50">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`w-full flex items-center justify-between p-4 text-left transition-colors duration-200 hover:bg-white/5 border-l-4 ${riskStyle.borderColorClass}`}
+                className={`w-full flex items-center justify-between p-4 text-left transition-colors duration-200 hover:bg-card/80`}
                 aria-expanded={isOpen}
                 aria-controls={contentId}
             >
                 <div className="flex items-center gap-3">
-                    <IconComponent className={`w-5 h-5 ${riskStyle.textColorClass}`} />
-                    <span className="font-semibold text-card-foreground">{level} Risk</span>
-                    <span className="px-2.5 py-0.5 text-xs font-semibold text-muted-foreground bg-background/50 rounded-full">{clauses.length}</span>
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-secondary`}>
+                      <IconComponent className={`w-5 h-5 ${riskStyle.textColorClass}`} />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-card-foreground">{level} Risk</span>
+                      <p className="text-xs text-muted-foreground">{clauses.length} clauses identified</p>
+                    </div>
                 </div>
-                <ChevronDownIcon className={`w-5 h-5 text-muted-foreground transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${riskStyle.bgColorClass}`}></div>
+                  <ChevronDownIcon className={`w-5 h-5 text-muted-foreground transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                </div>
             </button>
 
             <AnimatePresence initial={false}>
@@ -222,8 +225,8 @@ export const SummaryDisplay: React.FC<SummaryDisplayProps> = ({ clauses, isLoadi
 
   return (
     <div className="space-y-6 mt-8">
-      <h2 className="text-2xl font-bold text-left text-card-foreground font-serif">
-        Clause-by-Clause Breakdown
+      <h2 className="text-3xl font-bold text-left text-card-foreground font-serif">
+        Clause Breakdown
       </h2>
       <motion.div 
         layout 

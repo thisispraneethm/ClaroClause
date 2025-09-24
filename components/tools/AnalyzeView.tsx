@@ -182,9 +182,9 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
     return (
       <div className="h-full flex flex-col">
           {error && (
-            <div className="relative p-4 m-6 mb-0 bg-destructive/10 text-destructive-foreground rounded-lg text-sm border border-destructive/20">
+            <div className="relative p-4 m-6 mb-0 bg-destructive/10 text-destructive rounded-lg text-sm border border-destructive/20">
                 <div className="flex items-start pr-8">
-                    <InfoIcon className="w-5 h-5 mr-3 text-destructive flex-shrink-0 mt-0.5" />
+                    <InfoIcon className="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" />
                     <div>
                         <h4 className="font-semibold">Analysis Error</h4>
                         <p className="mt-1 opacity-90">{error}</p>
@@ -196,7 +196,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
             </div>
            )}
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 overflow-hidden">
-              <div className="flex flex-col overflow-hidden glass-panel rounded-xl relative">
+              <div className="flex flex-col overflow-hidden glass-panel rounded-xl relative border border-border/50">
                   <div className="flex items-center justify-between p-3 border-b border-border flex-shrink-0">
                       <h2 className="text-sm font-semibold text-foreground truncate pr-4">{analysis.documentTitle}</h2>
                        <button 
@@ -204,7 +204,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
                          className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-full text-muted-foreground bg-secondary/50 hover:bg-secondary hover:text-foreground transition-colors border border-border"
                        >
                          <ClipboardListIcon className="w-3 h-3"/>
-                         Analyze New
+                         Analyze New Document
                        </button>
                   </div>
                   <div ref={documentContainerRef} className="p-4 text-sm text-muted-foreground overflow-y-auto font-mono whitespace-pre-wrap flex-1 bg-background/50 relative">
@@ -219,7 +219,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.8 }}
                             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                            className="absolute z-20 flex items-center gap-1.5 px-2 py-1 text-xs rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/80 transition-transform hover:scale-105"
+                            className="absolute z-20 flex items-center gap-1.5 px-2 py-1 text-xs rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary/80 transition-transform hover:scale-105"
                             style={{ top: askButtonPosition.top, right: askButtonPosition.right }}
                             aria-label="Ask about this clause"
                         >
@@ -229,7 +229,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
                     )}
                   </AnimatePresence>
               </div>
-              <div className="overflow-y-auto pr-1">
+              <div className="overflow-y-auto pr-1 pb-4">
                  {analysisOptions && <PersonaSelector currentPersona={analysisOptions.persona} onPersonaChange={onRephrase} isRephrasing={isRephrasing}/>}
                  {analysis.keyTakeaways.length > 0 && <SummaryHeader analysis={analysis} />}
                  <SummaryDisplay 
@@ -257,7 +257,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
           {step === 'input' && (
             <>
               <div className="w-full max-w-4xl text-center">
-                <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-card-foreground font-serif">
+                <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-card-foreground font-serif">
                   Analyze Document
                 </h1>
                 <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -270,7 +270,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
               </div>
               <div className="w-full max-w-4xl mt-8">
                 {error && (
-                    <div className="relative mb-4 text-left text-destructive-foreground bg-destructive/20 p-3 pl-4 pr-10 rounded-lg w-full max-w-4xl animate-fade-in text-sm border border-destructive/30">
+                    <div className="relative mb-4 text-left text-destructive bg-destructive/10 p-3 pl-4 pr-10 rounded-lg w-full max-w-4xl animate-fade-in text-sm border border-destructive/20">
                         <p>{error}</p>
                         <button onClick={onClearError} aria-label="Clear error" className="absolute top-1/2 right-2 -translate-y-1/2 p-1 rounded-full hover:bg-destructive/30 transition-colors">
                             <XIcon className="w-4 h-4" />
@@ -302,7 +302,7 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
         </motion.div>
       </AnimatePresence>
       {error && step === 'processing' && !analysis && (
-        <div className="mt-8 text-center text-destructive-foreground bg-destructive/20 p-4 rounded-lg w-full max-w-4xl animate-fade-in border border-destructive/30">
+        <div className="mt-8 text-center text-destructive bg-destructive/10 p-4 rounded-lg w-full max-w-4xl animate-fade-in border border-destructive/20">
           <p>{error}</p>
         </div>
       )}

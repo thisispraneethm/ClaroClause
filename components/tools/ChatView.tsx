@@ -4,6 +4,7 @@ import { BrainCircuitIcon } from '../icons/BrainCircuitIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ClipboardListIcon } from '../icons/ClipboardListIcon';
 import { PaperAirplaneIcon } from '../icons/PaperAirplaneIcon';
+import { SparklesIcon } from '../icons/SparklesIcon';
 
 interface ChatViewProps {
   chatHistory: ChatMessage[];
@@ -21,18 +22,18 @@ const AiTypingIndicator: React.FC = () => (
     <div className="flex items-center gap-1.5 p-4">
         <motion.div 
             className="h-2 w-2 bg-muted-foreground rounded-full" 
-            animate={{ scale: [1, 1.2, 1] }} 
-            transition={{ duration: 0.5, repeat: Infinity, delay: 0 }}
+            animate={{ y: [0, -4, 0] }} 
+            transition={{ duration: 0.8, repeat: Infinity, delay: 0 }}
         />
         <motion.div 
             className="h-2 w-2 bg-muted-foreground rounded-full" 
-            animate={{ scale: [1, 1.2, 1] }} 
-            transition={{ duration: 0.5, repeat: Infinity, delay: 0.1 }}
+            animate={{ y: [0, -4, 0] }} 
+            transition={{ duration: 0.8, repeat: Infinity, delay: 0.1 }}
         />
         <motion.div 
             className="h-2 w-2 bg-muted-foreground rounded-full" 
-            animate={{ scale: [1, 1.2, 1] }} 
-            transition={{ duration: 0.5, repeat: Infinity, delay: 0.2 }}
+            animate={{ y: [0, -4, 0] }} 
+            transition={{ duration: 0.8, repeat: Infinity, delay: 0.2 }}
         />
     </div>
 );
@@ -80,7 +81,7 @@ const ChatBubble: React.FC<{ message: ChatMessage; onRetryMessage: (msg: string)
           <button
             onClick={() => onRetryMessage(message.originalMessage!)}
             disabled={isAiTyping}
-            className="mt-1 px-3 py-1 text-xs font-semibold bg-secondary/50 hover:bg-secondary/80 rounded-full disabled:opacity-50 transition-colors"
+            className="mt-1 px-3 py-1 text-xs font-semibold bg-secondary hover:bg-secondary/80 rounded-full disabled:opacity-50 transition-colors"
           >
             Try Again
           </button>
@@ -94,8 +95,8 @@ const ChatBubble: React.FC<{ message: ChatMessage; onRetryMessage: (msg: string)
   return (
     <div className={`flex items-start gap-3 ${isUser ? 'justify-end' : ''}`}>
       {!isUser && (
-         <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1 shadow-lg">
-            <BrainCircuitIcon className="w-5 h-5 text-primary-foreground" />
+         <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1 shadow-lg shadow-primary/20">
+            <SparklesIcon className="w-5 h-5 text-primary-foreground" />
          </div>
       )}
       <div 
@@ -103,7 +104,7 @@ const ChatBubble: React.FC<{ message: ChatMessage; onRetryMessage: (msg: string)
         ${isUser 
           ? 'bg-primary text-primary-foreground rounded-br-lg' 
           : message.error 
-          ? 'bg-destructive/10 border border-destructive/20 rounded-bl-lg'
+          ? 'bg-destructive/10 border border-destructive/20 text-destructive rounded-bl-lg'
           : 'glass-panel rounded-bl-lg'
         }`}
       >
@@ -116,25 +117,25 @@ const ChatBubble: React.FC<{ message: ChatMessage; onRetryMessage: (msg: string)
 const EmptyState: React.FC<{ onSendMessage: (msg: string) => void }> = ({ onSendMessage }) => {
     const suggestions = [
         "Summarize the most important clauses.",
-        "What are the biggest risks for me in this document?",
-        "Explain the termination clause in simple terms.",
+        "What are my biggest risks?",
+        "Explain the termination clause.",
     ];
 
     return (
         <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in p-4">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 border border-primary/20">
                 <BrainCircuitIcon className="w-8 h-8 text-primary" />
             </div>
-            <h2 className="text-2xl font-bold">Chat with your Document</h2>
+            <h2 className="text-3xl font-bold font-serif">Chat with your Document</h2>
             <p className="text-muted-foreground mt-2 max-w-md">
                 Ask questions, get summaries, and clarify complex points. Here are some suggestions to get you started:
             </p>
-            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                 {suggestions.slice(0, 3).map((suggestion) => (
                     <button
                         key={suggestion}
                         onClick={() => onSendMessage(suggestion)}
-                        className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary/50 border border-border rounded-full hover:bg-secondary transition-all duration-200"
+                        className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all duration-200"
                     >
                         {suggestion}
                     </button>
@@ -146,17 +147,17 @@ const EmptyState: React.FC<{ onSendMessage: (msg: string) => void }> = ({ onSend
 
 const InitErrorState: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
     <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in p-4">
-        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4 border border-destructive/20">
             <BrainCircuitIcon className="w-8 h-8 text-destructive" />
         </div>
-        <h2 className="text-2xl font-bold">Chat Unavailable</h2>
+        <h2 className="text-3xl font-bold font-serif">Chat Unavailable</h2>
         <p className="text-muted-foreground mt-2 max-w-md">
             The chat assistant could not be initialized. This might be a temporary connection issue.
         </p>
         <div className="mt-6">
             <button
                 onClick={onRetry}
-                className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary/50 border border-border rounded-full hover:bg-secondary transition-all duration-200"
+                className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all duration-200"
             >
                 Try Again
             </button>

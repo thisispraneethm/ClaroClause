@@ -29,18 +29,18 @@ interface ExampleContractsProps {
 
 export const ExampleContracts: React.FC<ExampleContractsProps> = ({ onSelect }) => {
   return (
-    <div className="mt-4 text-center">
+    <div className="mt-6 text-center">
       <p className="text-sm text-muted-foreground mb-3">Don't have a contract? Try an example:</p>
       <div className="flex items-center justify-center gap-3">
         <button
           onClick={() => onSelect(examples.privacyPolicy)}
-          className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary/50 border border-border rounded-full hover:bg-secondary transition-all duration-200"
+          className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary border border-border rounded-full hover:bg-secondary/80 transition-all duration-200"
         >
           Privacy Policy
         </button>
         <button
           onClick={() => onSelect(examples.rentalAgreement)}
-          className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary/50 border border-border rounded-full hover:bg-secondary transition-all duration-200"
+          className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary border border-border rounded-full hover:bg-secondary/80 transition-all duration-200"
         >
           Rental Agreement
         </button>

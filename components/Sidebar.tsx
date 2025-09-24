@@ -50,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTool, setActiveTool, isD
   const bottomNavItems: { id: string; icon: React.FC<any>; label: string; disabled: boolean }[] = [];
 
   return (
-    <aside className="w-16 md:w-20 bg-gradient-to-b from-card/10 to-card/20 backdrop-blur-xl border-r border-border flex flex-col items-center justify-between py-5 px-2 z-10">
+    <aside className="w-16 md:w-20 bg-card/20 border-r border-border flex flex-col items-center justify-between py-5 px-2 z-10">
       <div className="flex flex-col items-center gap-8">
         <motion.button 
             whileHover={{ scale: 1.1, rotate: 10 }}
@@ -59,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTool, setActiveTool, isD
             aria-label="ClaroClause Home"
             className="outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
         >
-          <SparklesIcon className="h-10 w-10 text-primary transition-transform duration-200" />
+          <SparklesIcon className="h-10 w-10 text-primary transition-colors duration-200 hover:text-white" />
         </motion.button>
         <nav>
           <ul className="flex flex-col items-center gap-3">
@@ -85,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTool, setActiveTool, isD
                       {activeTool === item.id && (
                           <motion.div
                               layoutId="active-indicator"
-                              className="absolute inset-0 bg-primary/10 rounded-xl"
+                              className="absolute inset-0 bg-primary/10 rounded-xl border border-primary/20"
                               initial={false}
                               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                           />

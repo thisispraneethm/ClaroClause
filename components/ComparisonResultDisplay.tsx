@@ -1,7 +1,7 @@
 import React from 'react';
 import type { ComparisonResult, ComparedClause } from '../types';
 import { ChangeType } from '../types';
-import { motion, AnimatePresence, Variants, useSpring, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, useSpring, useTransform } from 'framer-motion';
 import { InfoIcon } from './icons/InfoIcon';
 import { GitCompareArrowsIcon } from './icons/GitCompareArrowsIcon';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
@@ -61,9 +61,9 @@ const ClauseComparisonCard: React.FC<{ clause: ComparedClause }> = ({ clause }) 
     const renderContent = () => {
         switch (clause.changeType) {
             case ChangeType.Added:
-                return <div className="p-4 bg-background/50 rounded-b-lg"><p className="whitespace-pre-wrap break-words">{clause.textB}</p></div>;
+                return <div className="p-4 bg-background/50 rounded-b-lg"><p className="whitespace-pre-wrap break-words text-risk-low">{clause.textB}</p></div>;
             case ChangeType.Removed:
-                return <div className="p-4 bg-background/50 rounded-b-lg"><p className="whitespace-pre-wrap break-words">{clause.textA}</p></div>;
+                return <div className="p-4 bg-background/50 rounded-b-lg"><p className="whitespace-pre-wrap break-words text-risk-high line-through decoration-risk-high/70">{clause.textA}</p></div>;
             case ChangeType.Modified:
                 return (
                     <div className="bg-background/50 rounded-b-lg p-4">

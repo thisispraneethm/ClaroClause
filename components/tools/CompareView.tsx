@@ -184,14 +184,14 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
                     </div>
                 )}
                 <div className="mt-6 w-full max-w-6xl mx-auto flex flex-col md:flex-row gap-6 md:h-[60vh]">
-                    <DocumentInput title="Document A" value={docA} onChange={setDocA} onClear={() => setDocA('')} onError={setError} disabled={isLoading} />
-                    <DocumentInput title="Document B" value={docB} onChange={setDocB} onClear={() => setDocB('')} onError={setError} disabled={isLoading} />
+                    <DocumentInput title="Document A (Original)" value={docA} onChange={setDocA} onClear={() => setDocA('')} onError={setError} disabled={isLoading} />
+                    <DocumentInput title="Document B (Revised)" value={docB} onChange={setDocB} onClear={() => setDocB('')} onError={setError} disabled={isLoading} />
                 </div>
                 <div className="mt-8 flex justify-center">
                     <button
                         onClick={handleCompare}
                         disabled={isLoading || !docA.trim() || !docB.trim()}
-                        className="group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 disabled:opacity-50 bg-primary hover:bg-primary/80 shadow-lg shadow-primary/30"
+                        className="group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 disabled:opacity-50 bg-primary hover:scale-105 active:scale-100 shadow-lg shadow-primary-glow"
                     >
                       <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shine" />
                       <span className="relative flex items-center gap-2">
@@ -215,7 +215,7 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
                 <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mt-8 text-center text-destructive-foreground bg-destructive/20 border border-destructive/30 p-4 rounded-lg w-full max-w-4xl"
+                    className="mt-8 text-center text-destructive bg-destructive/10 border border-destructive/20 p-4 rounded-lg w-full max-w-4xl"
                 >
                     <p>{error}</p>
                 </motion.div>

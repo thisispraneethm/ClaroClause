@@ -2,6 +2,7 @@ import React from 'react';
 import type { AnalysisOptions, AnalysisPersona } from '../types';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { ArrowLeftIcon } from './icons/ArrowLeftIcon';
+import { BrainCircuitIcon } from './icons/BrainCircuitIcon';
 
 const personas: { id: AnalysisPersona; name: string; description: string }[] = [
     { id: 'layperson', name: 'Layperson', description: 'Simple, everyday language. Focus on practical implications.' },
@@ -36,12 +37,15 @@ export const PromptEnhancer: React.FC<PromptEnhancerProps> = ({ onAnalyze, onBac
     return (
         <div className="w-full max-w-3xl animate-fade-in">
             <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold font-serif">Enhance Analysis</h2>
+                <div className="w-16 h-16 mx-auto mb-4 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20">
+                    <BrainCircuitIcon className="w-8 h-8 text-primary" />
+                </div>
+                <h2 className="text-4xl font-bold font-serif">Enhance Analysis</h2>
                 <p className="text-muted-foreground mt-2">Tailor the AI's focus for more relevant results.</p>
             </div>
             <div className="glass-panel p-6 md:p-8 rounded-3xl space-y-8">
                 <div>
-                    <label className="text-lg font-semibold block mb-3">1. Select a Persona</label>
+                    <label className="text-lg font-semibold block mb-4">1. Select a Persona</label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {personas.map((p) => (
                             <div key={p.id}>
@@ -56,7 +60,7 @@ export const PromptEnhancer: React.FC<PromptEnhancerProps> = ({ onAnalyze, onBac
                                 />
                                 <label
                                     htmlFor={p.id}
-                                    className={`flex flex-col p-4 border rounded-xl cursor-pointer transition-all duration-200 ${options.persona === p.id ? 'bg-primary/20 border-primary/50 shadow-primary-glow' : 'bg-background/50 border-border hover:border-muted hover:bg-white/5'}`}
+                                    className={`flex flex-col p-4 border rounded-xl cursor-pointer transition-all duration-200 h-full ${options.persona === p.id ? 'bg-primary/20 border-primary shadow-primary-glow' : 'bg-background/50 border-border hover:border-primary/50'}`}
                                 >
                                     <span className="font-semibold">{p.name}</span>
                                     <span className="text-xs text-muted-foreground mt-1">{p.description}</span>
@@ -83,14 +87,14 @@ export const PromptEnhancer: React.FC<PromptEnhancerProps> = ({ onAnalyze, onBac
             <div className="mt-8 flex items-center justify-between">
                 <button
                     onClick={onBack}
-                    className="inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-medium rounded-full transition-colors bg-secondary/50 text-foreground hover:bg-secondary border border-border"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-medium rounded-full transition-colors bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border"
                 >
                     <ArrowLeftIcon className="h-4 w-4"/>
                     Back
                 </button>
                 <button
                     onClick={handleSubmit}
-                    className={`group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 bg-primary hover:bg-primary/80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring shadow-lg shadow-primary/20 animate-subtle-pulse`}
+                    className={`group relative inline-flex items-center justify-center px-8 py-3 h-12 overflow-hidden rounded-full font-semibold text-primary-foreground transition-all duration-300 bg-primary hover:scale-105 active:scale-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-ring shadow-lg shadow-primary-glow animate-subtle-pulse`}
                 >
                     <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shine" />
                     <span className="relative flex items-center gap-2">
