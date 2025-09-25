@@ -63,7 +63,7 @@ type AppAction =
   | { type: 'FINISH_CHAT_STREAM' }
   | { type: 'RESET_ACTIVE_ANALYSIS' }
   | { type: 'DELETE_ANALYSIS_START'; payload: number }
-  | { type: 'DELETE_ANALYSIS_FINISH' }
+  | { type: 'DELETE_ANALYSIS_FINISH'; payload: { error?: string } }
   | { type: 'HISTORY_CLEARED' }
   | { type: 'ANALYSIS_DELETED_EXTERNALLY' }
   | { type: 'SET_CITED_CLAUSE'; payload: { text: string; occurrence: number } | null }
@@ -98,9 +98,8 @@ const initialState: AppState = {
 
 
 /**
- * FIX: Created a shared helper function to load analysis data into state.
- * This removes code duplication between the `HYDRATE_STATE` and `LOAD_ANALYSIS`
- * actions, ensuring consistent state transitions and improving maintainability.
+ * Helper function to load a persisted analysis object into the application state.
+ * This removes code duplication between hydration and manual loading actions.
  */
 function loadAnalysisIntoState(state: AppState, persisted: PersistedAnalysis): AppState {
     return {
@@ -116,19 +115,39 @@ function loadAnalysisIntoState(state: AppState, persisted: PersistedAnalysis): A
     };
 }
 
+/**
+ * Helper function to reset all analysis-related state to its initial values.
+ * This is used when starting a new analysis, clearing history, or when the
+ * current analysis is deleted, ensuring a clean state and preventing bugs
+ * from stale data.
+ */
+function resetAnalysisState(state: AppState): Omit<AppState, 'history' | 'activeTool'> {
+    return {
+        ...state,
+        contractText: '',
+        analysis: null,
+        analysisOptions: null, // Ensures old options don't persist
+        chatHistory: [],
+        isDocumentLoaded: false,
+        error: null,
+        currentAnalysisId: undefined,
+        isChatReady: false,
+    };
+}
+
 
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_TOOL':
-      // FIX: Cancel any ongoing AI operations (streams, requests) when the user switches tools.
-      // This prevents "zombie" processes, resource leaks, and state corruption.
+      // It's crucial to cancel any ongoing AI streams or requests when the user switches
+      // tools to prevent resource leaks, race conditions, and unexpected state updates.
       geminiService.cancelOngoingOperations();
       return { 
         ...state, 
         activeTool: action.payload, 
         error: null, 
         citedClause: null,
-        // BUG FIX: Clear pre-populated chat message when navigating away from the chat tool.
+        // Clear pre-populated chat message when navigating away from the chat tool.
         prepopulatedChatMessage: action.payload === 'chat' ? state.prepopulatedChatMessage : null
       };
     case 'SET_HISTORY':
@@ -140,14 +159,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       geminiService.cancelOngoingOperations();
       return {
         ...state,
-        contractText: '',
-        analysis: null,
-        chatHistory: [],
-        isDocumentLoaded: false,
-        error: null,
-        currentAnalysisId: undefined,
+        ...resetAnalysisState(state),
         activeTool: 'analyze',
-        isChatReady: false,
       };
     case 'LOAD_ANALYSIS': {
       geminiService.cancelOngoingOperations();
@@ -248,43 +261,26 @@ function appReducer(state: AppState, action: AppAction): AppState {
         geminiService.cancelOngoingOperations();
         return {
             ...state,
-            contractText: '',
-            analysis: null,
-            chatHistory: [],
-            isDocumentLoaded: false,
-            error: null,
-            currentAnalysisId: undefined,
+            ...resetAnalysisState(state),
             activeTool: 'history',
-            isChatReady: false,
         };
     case 'DELETE_ANALYSIS_START':
       return { ...state, deletingId: action.payload };
     case 'DELETE_ANALYSIS_FINISH':
-      return { ...state, deletingId: null };
+      return { ...state, deletingId: null, error: action.payload.error || null };
     case 'HISTORY_CLEARED':
       return {
         ...state,
+        ...resetAnalysisState(state),
         history: [],
-        contractText: '',
-        analysis: null,
-        chatHistory: [],
-        isDocumentLoaded: false,
-        error: null,
-        currentAnalysisId: undefined,
         activeTool: 'history',
-        isChatReady: false,
       };
     case 'ANALYSIS_DELETED_EXTERNALLY':
         return {
             ...state,
-            contractText: '',
-            analysis: null,
-            chatHistory: [],
-            isDocumentLoaded: false,
+            ...resetAnalysisState(state),
             error: 'The current analysis was deleted, possibly in another tab. Please load or start a new analysis.',
-            currentAnalysisId: undefined,
             activeTool: 'history',
-            isChatReady: false,
         };
     case 'SET_CITED_CLAUSE':
       return { ...state, citedClause: action.payload, activeTool: 'analyze' };
@@ -498,9 +494,12 @@ const App: React.FC = () => {
         if (isDeletingCurrent) {
             dispatch({ type: 'RESET_ACTIVE_ANALYSIS' });
         }
-    } finally {
-        dispatch({ type: 'DELETE_ANALYSIS_FINISH' });
+    } catch (err) {
+        console.error("Failed to delete analysis:", err);
+        dispatch({ type: 'DELETE_ANALYSIS_FINISH', payload: { error: "Failed to delete the analysis from the database." } });
+        return;
     }
+    dispatch({ type: 'DELETE_ANALYSIS_FINISH', payload: {} });
   };
 
   const handleClearAllHistory = async () => {
@@ -530,8 +529,6 @@ const App: React.FC = () => {
     try {
         const rephrasedClauses = await geminiService.rephraseAnalysis(state.analysis.clauses, newOptions);
         
-        dispatch({ type: 'REPHRASE_SUCCESS', payload: { rephrasedClauses, newOptions }});
-
         const currentAnalysis = state.analysis;
         const updatedClauses = currentAnalysis.clauses.map(originalClause => {
             const updated = rephrasedClauses.find(rc => rc.id === originalClause.id);
@@ -539,7 +536,15 @@ const App: React.FC = () => {
         });
         const updatedAnalysis: ContractAnalysis = { ...currentAnalysis, clauses: updatedClauses };
 
-        await updateAnalysis(state.currentAnalysisId, updatedAnalysis, newOptions);
+        const isUpdated = await updateAnalysis(state.currentAnalysisId, updatedAnalysis, newOptions);
+
+        if (!isUpdated) {
+            dispatch({ type: 'ANALYSIS_DELETED_EXTERNALLY' });
+            return;
+        }
+
+        dispatch({ type: 'REPHRASE_SUCCESS', payload: { rephrasedClauses, newOptions }});
+
         await loadHistory();
 
     } catch(e) {

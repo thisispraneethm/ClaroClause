@@ -124,7 +124,7 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
   );
 };
 
-const RiskGroupAccordion: React.FC<{ level: RiskLevel, clauses: DecodedClause[], onClauseHover: (clauseText: string | null, occurrence: number | null) => void; }> = ({ level, clauses, onClauseHover }) => {
+const RiskGroupAccordion: React.FC<{ level: RiskLevel, clauses: DecodedClause[], onClauseHover: (clauseText: string | null, occurrence: number | null) => void; }> = React.memo(({ level, clauses, onClauseHover }) => {
     const [isOpen, setIsOpen] = React.useState(level === RiskLevel.High); // High risk is open by default
     const riskStyle = riskStyles[level];
     const IconComponent = riskStyle.icon;
@@ -173,9 +173,9 @@ const RiskGroupAccordion: React.FC<{ level: RiskLevel, clauses: DecodedClause[],
                         <div className={`p-4 space-y-4 border-t border-border/50`}>
                             <AnimatePresence>
                                 {clauses.map((clause) => (
-                                    // BUG FIX: Switched key from a fragile index/title combo to the stable, unique `clause.id`.
-                                    // This is critical for React's reconciliation algorithm to correctly track items,
-                                    // preventing state mismatches and rendering bugs.
+                                    // Using the stable, unique `clause.id` as the key is critical for React's
+                                    // reconciliation algorithm. It allows React to correctly track items
+                                    // during re-renders, preventing state mismatches and improving performance.
                                     <ClauseCard key={clause.id} clause={clause} onHover={onClauseHover} />
                                 ))}
                             </AnimatePresence>
@@ -185,7 +185,7 @@ const RiskGroupAccordion: React.FC<{ level: RiskLevel, clauses: DecodedClause[],
             </AnimatePresence>
         </motion.div>
     );
-};
+});
 
 
 interface SummaryDisplayProps {

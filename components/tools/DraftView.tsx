@@ -47,9 +47,7 @@ export const DraftView: React.FC = () => {
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') {
          console.log("Draft stream was cancelled.");
-         if (isMounted.current) {
-            setError("Drafting was cancelled.");
-         }
+         // Do not set an error for user-initiated cancellation.
          return;
       }
       const message = e instanceof Error ? e.message : 'An unknown error occurred while drafting.';
@@ -79,7 +77,8 @@ export const DraftView: React.FC = () => {
     const textarea = promptTextareaRef.current;
     if (textarea) {
         textarea.style.height = 'auto';
-        textarea.style.height = `${textarea.scrollHeight}px`;
+        const newHeight = Math.min(textarea.scrollHeight, parseFloat(getComputedStyle(textarea).maxHeight) || Infinity);
+        textarea.style.height = `${newHeight}px`;
     }
   }, [prompt]);
   
@@ -87,7 +86,8 @@ export const DraftView: React.FC = () => {
     const textarea = resultTextareaRef.current;
     if (textarea) {
         textarea.style.height = 'auto';
-        textarea.style.height = `${textarea.scrollHeight}px`;
+        const newHeight = Math.min(textarea.scrollHeight, parseFloat(getComputedStyle(textarea).maxHeight) || Infinity);
+        textarea.style.height = `${newHeight}px`;
     }
   }, [result]);
 
@@ -112,7 +112,7 @@ export const DraftView: React.FC = () => {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="e.g., a simple non-disclosure agreement for a freelance project..."
-            className="w-full min-h-[8rem] p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner"
+            className="w-full min-h-[8rem] p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all duration-300 resize-none shadow-inner max-h-60"
             disabled={isDrafting}
           />
           <div className="mt-6 flex justify-end">
@@ -163,7 +163,7 @@ export const DraftView: React.FC = () => {
               onChange={(e) => setResult(e.target.value)}
               readOnly={isDrafting}
               placeholder={isDrafting ? "AI is generating your document..." : "Generated document will appear here."}
-              className={`w-full min-h-[250px] p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary transition-all duration-300 resize-y shadow-inner ${isDrafting ? 'is-drafting' : ''}`}
+              className={`w-full min-h-[250px] p-4 bg-background/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary transition-all duration-300 resize-y shadow-inner max-h-[60vh] ${isDrafting ? 'is-drafting' : ''}`}
             />
           </div>
         </motion.div>

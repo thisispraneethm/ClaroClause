@@ -5,6 +5,12 @@ export enum RiskLevel {
   Unknown = 'Unknown'
 }
 
+// FIX: Added a constant for confidence levels to be the single source of truth.
+export const CONFIDENCE_LEVELS = ['High', 'Medium', 'Low'] as const;
+type ConfidenceTuple = typeof CONFIDENCE_LEVELS;
+export type ConfidenceLevel = ConfidenceTuple[number];
+
+
 export interface DecodedClause {
   // A unique ID and occurrence index are added to each clause for robust citation.
   id: string;
@@ -13,7 +19,7 @@ export interface DecodedClause {
   explanation: string;
   risk: RiskLevel;
   originalClause: string;
-  confidence: 'High' | 'Medium' | 'Low';
+  confidence: ConfidenceLevel;
   goodToKnow?: boolean;
 }
 

@@ -20,9 +20,8 @@ const Tooltip: React.FC<{ text: string; children: React.ReactElement; id: string
     return (
         <div className="relative group flex items-center">
             {/*
-              Breathtaking Polish: The spread operator (`...`) on `children.props` can cause type errors.
-              Using `Object.assign` is a safer, more robust way to merge props, resolving potential
-              "Spread types may only be created from object types" errors and improving maintainability.
+              Using `Object.assign` is a safer, more robust way to merge props than the spread
+              operator (`...`) on `children.props`, which can cause type errors.
             */}
             {React.cloneElement(children, Object.assign({}, children.props, { 'aria-describedby': id }))}
             <div 
@@ -36,9 +35,16 @@ const Tooltip: React.FC<{ text: string; children: React.ReactElement; id: string
     )
 }
 
+interface NavItem {
+  id: Tool;
+  icon: React.FC<any>;
+  label: string;
+  disabled: boolean;
+}
+
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTool, setActiveTool, isDocumentLoaded }) => {
-  const navItems = [
+  const navItems: NavItem[] = [
     { id: 'home', icon: HomeIcon, label: 'Home', disabled: false },
     { id: 'analyze', icon: ClipboardListIcon, label: 'Analyze Document', disabled: false },
     { id: 'chat', icon: MessageCircleIcon, label: 'Chat with Document', disabled: !isDocumentLoaded },
@@ -47,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTool, setActiveTool, isD
     { id: 'history', icon: HistoryIcon, label: 'Analysis History', disabled: false },
   ];
   
-  const bottomNavItems: { id: string; icon: React.FC<any>; label: string; disabled: boolean }[] = [];
+  const bottomNavItems: NavItem[] = [];
 
   return (
     <aside className="w-16 md:w-20 bg-card/20 border-r border-border flex flex-col items-center justify-between py-5 px-2 z-10">
@@ -69,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTool, setActiveTool, isD
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
-                      onClick={() => !item.disabled && setActiveTool(item.id as Tool)}
+                      onClick={() => !item.disabled && setActiveTool(item.id)}
                       disabled={item.disabled}
                       aria-label={item.label}
                       className={`
@@ -108,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTool, setActiveTool, isD
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
-                      onClick={() => !item.disabled && setActiveTool(item.id as Tool)}
+                      onClick={() => !item.disabled && setActiveTool(item.id)}
                       disabled={item.disabled}
                       aria-label={item.label}
                       className={`

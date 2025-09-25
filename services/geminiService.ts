@@ -1,8 +1,7 @@
 import { GoogleGenAI, Type, Chat, GenerateContentResponse } from '@google/genai';
 import { MAX_COMPARE_TEXT_LENGTH } from '../constants';
-// FIX: Added HeaderAnalysis to type imports for explicit typing of the parsed header JSON.
 import type { AnalysisOptions, AnalysisStreamEvent, ContractAnalysis, DecodedClause, ComparisonResult, RephrasedClause, HeaderAnalysis } from '../types';
-import { RiskLevel } from '../types';
+import { RiskLevel, CONFIDENCE_LEVELS } from '../types';
 
 /**
  * A targeted sanitization function to mitigate prompt injection.
@@ -16,22 +15,21 @@ function sanitizeInput(text: string): string {
 }
 
 /**
- * FIX: Added a validation layer for AI-generated clause data.
- * This function ensures that the data structure conforms to the application's expectations,
- * preventing crashes from unexpected or malformed API responses (e.g., an invalid 'risk' enum value).
+ * Provides a validation layer for AI-generated clause data. This function ensures
+ * that the data structure from the API conforms to the application's expectations,
+ * preventing crashes from unexpected or malformed responses (e.g., an invalid 'risk' enum value).
  * It provides safe default values for missing or invalid fields.
  */
 function validateClause(partialClause: any): Omit<DecodedClause, 'id' | 'occurrenceIndex'> {
     const riskValues = Object.values(RiskLevel);
-    const confidenceValues = ['High', 'Medium', 'Low'];
-
+    
     // Ensure risk is a valid enum value, otherwise default to 'Unknown'.
     const validatedRisk = partialClause.risk && riskValues.includes(partialClause.risk)
         ? partialClause.risk
         : RiskLevel.Unknown;
 
     // Ensure confidence is a valid enum value, otherwise default to 'Low'.
-    const validatedConfidence = partialClause.confidence && confidenceValues.includes(partialClause.confidence)
+    const validatedConfidence = partialClause.confidence && CONFIDENCE_LEVELS.includes(partialClause.confidence)
         ? partialClause.confidence
         : 'Low';
     
@@ -53,7 +51,7 @@ const clauseSchema = {
         explanation: { type: Type.STRING, description: "A simple, plain-English explanation of what the clause means and its implications." },
         risk: { type: Type.STRING, enum: ['Low', 'Medium', 'High', 'Unknown'], description: "The potential risk level for the user." },
         originalClause: { type: Type.STRING, description: "The exact, verbatim text of the original clause from the source document." },
-        confidence: { type: Type.STRING, enum: ['High', 'Medium', 'Low'], description: "The AI's confidence in its analysis of this specific clause." },
+        confidence: { type: Type.STRING, enum: [...CONFIDENCE_LEVELS], description: "The AI's confidence in its analysis of this specific clause." },
         goodToKnow: { type: Type.BOOLEAN, description: "True if this clause contains positive or beneficial information for the user." },
     },
     required: ["title", "explanation", "risk", "originalClause", "confidence"]
@@ -132,9 +130,10 @@ class GeminiService {
   }
 
   /**
-   * FIX: Created a single, robust cancellation method for ALL ongoing AI operations.
+   * Provides a single, robust cancellation method for ALL ongoing AI operations.
    * This unified approach aborts both streaming and non-streaming requests,
-   * preventing race conditions and resource leaks across the entire application.
+   * preventing race conditions and resource leaks when the user navigates away
+   * or starts a new action.
    */
   public cancelOngoingOperations = () => {
     if (this.streamAbortController) {
@@ -148,7 +147,8 @@ class GeminiService {
   };
 
   /**
-   * HARDEN: Wraps a non-streaming API call to make it cancellable.
+   * Wraps a non-streaming API call with a Promise.race to make it cancellable.
+   * This is essential for preventing orphaned requests if the user navigates away.
    */
   private async _cancellableGenerateContent(
     ...args: Parameters<typeof this.ai.models.generateContent>
@@ -172,9 +172,9 @@ class GeminiService {
   }
 
   /**
-   * HARDEN: Centralized JSON response parsing and validation.
-   * This helper checks for common failure modes (like safety blocks) before
-   * attempting to parse the JSON, providing clearer, more specific error messages.
+   * Centralizes JSON response parsing and validation. This helper checks for common
+   * failure modes (like safety blocks) before attempting to parse the JSON,
+   * providing clearer, more specific error messages to the user.
    */
   private _parseJsonResponse<T>(response: GenerateContentResponse, errorMessage: string): T {
     const text = response.text?.trim();
@@ -189,7 +189,7 @@ class GeminiService {
         throw new Error("The AI returned an empty response. It may have been unable to process the request.");
     }
     try {
-        const jsonMatch = text.match(/```(json)?\s*([\s\S]*?)\s*```/);
+        const jsonMatch = text.match(/```(json)?\s*([\sS]*?)\s*```/);
         const jsonString = jsonMatch ? jsonMatch[2] : text;
         return JSON.parse(jsonString);
     } catch (e) {
@@ -199,13 +199,14 @@ class GeminiService {
   }
 
   /**
-   * HARDEN: Centralized error handling for all AI calls.
-   * This checks for common, specific error types like cancellation or rate limiting.
+   * Centralizes error handling for all AI API calls. It checks for common,
+   * specific error types like user-initiated cancellation or rate limiting to
+   * provide more helpful feedback.
    */
   private _handleApiError(e: unknown, defaultMessage: string): Error {
     if (e instanceof Error) {
         if (e.name === 'AbortError') {
-            return e; // Propagate cancellation errors
+            return e; // Propagate cancellation errors gracefully
         }
         if (e.message.includes('429')) {
             return new Error("Too many requests. Please wait a moment and try again.");
@@ -245,6 +246,9 @@ Answer the user's questions about this document in a clear, concise, and helpful
     if (!this.chat) throw new Error("Chat not initialized.");
     if (!message) throw new Error("Cannot send an empty message.");
     
+    // This pattern is used to make an otherwise non-cancellable stream cancellable.
+    // The AbortController is managed externally by `cancelOngoingOperations`.
+    // Inside the loop, we check if a cancellation has been requested.
     this.cancelOngoingOperations();
     const localAbortController = new AbortController();
     this.streamAbortController = localAbortController;
@@ -270,6 +274,7 @@ Answer the user's questions about this document in a clear, concise, and helpful
     Prompt: "${sanitizeInput(prompt)}"
     Based on the prompt, generate a well-structured document. If the prompt is ambiguous, create a standard version of the requested document.`;
 
+    // This pattern is used to make an otherwise non-cancellable stream cancellable.
     this.cancelOngoingOperations();
     const localAbortController = new AbortController();
     this.streamAbortController = localAbortController;
@@ -314,11 +319,9 @@ ${chunks[0].substring(0, 4000)}
 DOCUMENT END.
 Based on this initial text, provide a concise title for the document, an overall fairness score from 0 to 100, and 3-5 key takeaways. Explain these as if you were talking to ${personaDescription}.`;
         
-        // BUG FIX: The header request is now cancellable.
         const headerResponse = await this._cancellableGenerateContent({
             model: 'gemini-2.5-flash', contents: headerPrompt, config: { responseMimeType: 'application/json', responseSchema: headerSchema }
         });
-        // FIX: Explicitly cast the parsed JSON to HeaderAnalysis to resolve type error.
         const headerJson = this._parseJsonResponse<HeaderAnalysis>(headerResponse, "The AI failed to generate a valid document summary. The document may be malformed or un-analyzable.");
         yield { type: 'header', data: headerJson };
 
@@ -331,20 +334,24 @@ CHUNK START:
 ${chunks[i]}
 ---
 CHUNK END.`;
-            // NOTE: This part of the stream uses a separate, non-cancellable request per chunk.
-            // This is an intentional design choice to make the stream progressively render results.
-            // A cancellation will stop the *loop* from proceeding to the next chunk.
-            const clauseResponse = await this.ai.models.generateContent({ model: 'gemini-2.5-flash', contents: clausePrompt, config: { responseMimeType: 'application/json', responseSchema: analysisSchema }});
-            const clausesData = this._parseJsonResponse<any[]>(clauseResponse, `The AI failed to analyze a section of the document (chunk ${i+1}).`);
             
-            if (Array.isArray(clausesData)) {
-                for (const item of clausesData) {
-                    const validatedItem = validateClause(item);
-                    const originalText = validatedItem.originalClause;
-                    const currentOccurrence = occurrenceMap[originalText] || 0;
-                    occurrenceMap[originalText] = currentOccurrence + 1;
-                    yield { type: 'clause', data: { ...validatedItem, id: `clause-${i}-${clausesData.indexOf(item)}`, occurrenceIndex: currentOccurrence } };
+            try {
+                const clauseResponse = await this.ai.models.generateContent({ model: 'gemini-2.5-flash', contents: clausePrompt, config: { responseMimeType: 'application/json', responseSchema: analysisSchema }});
+                const clausesData = this._parseJsonResponse<any[]>(clauseResponse, `The AI failed to analyze a section of the document (chunk ${i+1}).`);
+                
+                if (Array.isArray(clausesData)) {
+                    for (const item of clausesData) {
+                        const validatedItem = validateClause(item);
+                        const originalText = validatedItem.originalClause;
+                        const currentOccurrence = occurrenceMap[originalText] || 0;
+                        occurrenceMap[originalText] = currentOccurrence + 1;
+                        yield { type: 'clause', data: { ...validatedItem, id: `clause-${i}-${clausesData.indexOf(item)}`, occurrenceIndex: currentOccurrence } };
+                    }
                 }
+            } catch (chunkError) {
+                console.error(`Skipping problematic chunk ${i+1} due to error:`, chunkError);
+                // Continue to the next chunk instead of terminating the entire stream
+                continue;
             }
         }
     } catch(e) {
@@ -352,11 +359,6 @@ CHUNK END.`;
     }
   }
 
-  /**
-   * BUG FIX: Refactored `compareDocuments` to be robustly cancellable.
-   * This prevents wasted resources and potential race conditions if the user
-   * navigates away while a comparison is in progress.
-   */
   public async compareDocuments(docA: string, docB: string): Promise<ComparisonResult> {
     if (docA.length + docB.length > MAX_COMPARE_TEXT_LENGTH) {
         throw new Error(`The combined size of the documents is too large. Please shorten them and try again.`);

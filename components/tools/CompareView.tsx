@@ -24,12 +24,12 @@ const DocumentInput: React.FC<DocumentInputProps> = ({ title, value, onChange, o
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
     const [isReadingFile, setIsReadingFile] = React.useState(false);
 
-    // UX FIX: Auto-resize textarea height based on content.
     React.useEffect(() => {
         const textarea = textareaRef.current;
         if (textarea) {
             textarea.style.height = 'auto';
-            textarea.style.height = `${textarea.scrollHeight}px`;
+            const newHeight = Math.min(textarea.scrollHeight, parseFloat(getComputedStyle(textarea).maxHeight) || Infinity);
+            textarea.style.height = `${newHeight}px`;
         }
     }, [value]);
 
@@ -75,7 +75,7 @@ const DocumentInput: React.FC<DocumentInputProps> = ({ title, value, onChange, o
                     value={value}
                     onChange={handleTextAreaChange}
                     placeholder={`Paste document text here...`}
-                    className="w-full h-full p-3 bg-background/50 border border-border rounded-lg resize-none focus:ring-2 focus:ring-primary/50 transition"
+                    className="w-full h-full p-3 bg-background/50 border border-border rounded-lg resize-none focus:ring-2 focus:ring-primary/50 transition max-h-full"
                     disabled={disabled || isReadingFile}
                 />
                 {value && !disabled && (
@@ -104,18 +104,24 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
     const [isLoading, setIsLoading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const isMounted = React.useRef(true);
+    const hasPrepopulated = React.useRef(false);
 
+
+    // This effect pre-populates Document A from the Analyze view, but only if
+    // Document A is empty. This prevents overwriting user edits if they navigate away and back.
     React.useEffect(() => {
-        setDocA(initialDocument);
-    }, [initialDocument]);
+        if (initialDocument && !docA && !hasPrepopulated.current) {
+          setDocA(initialDocument);
+          hasPrepopulated.current = true;
+        }
+    }, [initialDocument, docA]);
     
     React.useEffect(() => {
         isMounted.current = true;
         return () => {
             isMounted.current = false;
-            // BUG FIX: The "compare" operation is now cancellable.
-            // This prevents the API request from continuing in the background
-            // if the user navigates away, saving resources and preventing errors.
+            // The `compareDocuments` operation is cancellable. This ensures the API request
+            // is aborted if the user navigates away, saving resources and preventing errors.
             geminiService.cancelOngoingOperations();
         };
     }, []);

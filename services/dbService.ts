@@ -16,10 +16,8 @@ export class ClaroClauseDB extends Dexie {
 
   constructor() {
     super('ClaroClauseDB');
-    // FIX: Refactored database versioning to use the standard chained `version()` pattern.
-    // This is the correct, industry-standard way to declare schemas and migrations in Dexie,
-    // improving code clarity and ensuring robust, predictable database upgrades.
-    // FIX: Added (this as Dexie) type assertion to resolve TypeScript error where 'version' method was not found on the subclass.
+    // Using the chained .version().stores() pattern is the standard and most
+    // robust way to declare schemas and handle migrations in Dexie.
     (this as Dexie).version(1).stores({
       analyses: '++id, createdAt'
     });

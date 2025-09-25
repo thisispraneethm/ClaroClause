@@ -46,7 +46,9 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
 
     const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent the parent button's onLoad from firing.
-        onDelete();
+        if (window.confirm('Are you sure you want to permanently delete this analysis? This action cannot be undone.')) {
+            onDelete();
+        }
     };
 
     return (
