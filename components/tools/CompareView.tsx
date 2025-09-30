@@ -98,23 +98,12 @@ interface CompareViewProps {
 }
 
 export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => {
-    const [docA, setDocA] = React.useState('');
+    const [docA, setDocA] = React.useState(initialDocument || '');
     const [docB, setDocB] = React.useState('');
     const [result, setResult] = React.useState<ComparisonResult | null>(null);
     const [isLoading, setIsLoading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const isMounted = React.useRef(true);
-    const hasPrepopulated = React.useRef(false);
-
-
-    // This effect pre-populates Document A from the Analyze view, but only if
-    // Document A is empty. This prevents overwriting user edits if they navigate away and back.
-    React.useEffect(() => {
-        if (initialDocument && !docA && !hasPrepopulated.current) {
-          setDocA(initialDocument);
-          hasPrepopulated.current = true;
-        }
-    }, [initialDocument, docA]);
     
     React.useEffect(() => {
         isMounted.current = true;
@@ -158,6 +147,8 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
         // Do not clear docA and docB to allow users to make edits and re-compare
     };
 
+    const showLoadButton = initialDocument && initialDocument !== docA;
+
     const renderContent = () => {
         if (result) {
             return <ComparisonResultDisplay result={result} onReset={handleReset} />;
@@ -182,10 +173,10 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
                       See what’s changed between two versions of a document.
                     </p>
                 </div>
-                {initialDocument && !docA && (
-                    <div className="text-center my-4">
+                {showLoadButton && (
+                    <div className="text-center my-4 animate-fade-in">
                         <button onClick={() => setDocA(initialDocument)} className="flex items-center gap-2 mx-auto px-4 py-2 text-sm font-medium rounded-full transition-colors bg-secondary/50 hover:bg-secondary border border-border">
-                            <DocumentTextIcon className="w-4 h-4" /> Load current document into Document A
+                            <DocumentTextIcon className="w-4 h-4" /> Load latest analyzed document into Document A
                         </button>
                     </div>
                 )}

@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useState, useRef } from 'react';
+import React, { useLayoutEffect, useState, useRef, useCallback } from 'react';
 import type { ContractAnalysis, AnalysisOptions, AnalysisPersona } from '../../types';
 import { ContractInput } from '../ContractInput';
 import { ExampleContracts } from '../ExampleContracts';
@@ -145,9 +145,9 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
     onAnalyze(contractText, options);
   };
   
-  const handleClauseHover = (text: string | null, occurrence: number | null) => {
+  const handleClauseHover = useCallback((text: string | null, occurrence: number | null) => {
     setHoveredClause({ text, occurrence });
-  };
+  }, []);
 
   React.useEffect(() => {
     if (!analysis && !isLoading) {

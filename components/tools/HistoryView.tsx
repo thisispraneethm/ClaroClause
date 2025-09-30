@@ -62,7 +62,6 @@ const HistoryCard: React.FC<{ item: PersistedAnalysis; onLoad: () => void; onDel
         >
             <button
                 onClick={onLoad}
-                disabled={isDeleting}
                 aria-label={`Load analysis for ${item.documentTitle || 'Untitled Document'}`}
                 className="w-full text-left glass-panel p-4 rounded-xl flex items-center justify-between transition-all duration-200 hover:bg-card/80 hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:transform-none group"
             >

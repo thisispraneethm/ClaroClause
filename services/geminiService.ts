@@ -117,16 +117,29 @@ const rephraseSchema = {
 
 
 class GeminiService {
-  private ai: GoogleGenAI;
+  private ai: GoogleGenAI | null = null;
   private chat: Chat | null = null;
   private streamAbortController: AbortController | null = null;
   private requestAbortController: AbortController | null = null;
 
   constructor() {
-    if (!process.env.API_KEY) {
-      throw new Error("API_KEY environment variable not set");
+    // Constructor is now safe and won't throw on instantiation.
+  }
+  
+  /**
+   * Lazily initializes and returns the GoogleGenAI instance.
+   * This prevents the app from crashing on startup if the API key is not set,
+   * allowing for graceful error handling within the application UI.
+   */
+  private getAi(): GoogleGenAI {
+    if (!this.ai) {
+        if (!process.env.API_KEY) {
+            // Provide a more user-friendly error message.
+            throw new Error("API_KEY environment variable not set. Please configure it to use the application.");
+        }
+        this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     }
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    return this.ai;
   }
 
   /**
@@ -151,7 +164,7 @@ class GeminiService {
    * This is essential for preventing orphaned requests if the user navigates away.
    */
   private async _cancellableGenerateContent(
-    ...args: Parameters<typeof this.ai.models.generateContent>
+    ...args: Parameters<InstanceType<typeof GoogleGenAI>['models']['generateContent']>
   ): Promise<GenerateContentResponse> {
     const localAbortController = new AbortController();
     this.requestAbortController = localAbortController;
@@ -162,7 +175,7 @@ class GeminiService {
             if (signal.aborted) return reject(new DOMException('Aborted', 'AbortError'));
             signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
         });
-        const generatePromise = this.ai.models.generateContent(...args);
+        const generatePromise = this.getAi().models.generateContent(...args);
         return await Promise.race([generatePromise, abortPromise]);
     } finally {
         if (this.requestAbortController === localAbortController) {
@@ -234,7 +247,7 @@ ${clauseContext}
 
 Answer the user's questions about this document in a clear, concise, and helpful manner. When your answer is based on specific clauses, you MUST cite them by referencing their unique ID in brackets, like this: [Citation: clause-ID-goes-here]. This is mandatory for accuracy and verifiability. Do not provide legal advice.`;
 
-    this.chat = this.ai.chats.create({
+    this.chat = this.getAi().chats.create({
       model: 'gemini-2.5-flash',
       config: {
           systemInstruction,
@@ -281,7 +294,7 @@ Answer the user's questions about this document in a clear, concise, and helpful
     const signal = localAbortController.signal;
 
     try {
-        const result = await this.ai.models.generateContentStream({ model: 'gemini-2.5-flash', contents: fullPrompt });
+        const result = await this.getAi().models.generateContentStream({ model: 'gemini-2.5-flash', contents: fullPrompt });
         for await (const chunk of result) {
             if (signal.aborted) throw new DOMException('Stream aborted by user', 'AbortError');
             yield chunk.text;
@@ -336,7 +349,7 @@ ${chunks[i]}
 CHUNK END.`;
             
             try {
-                const clauseResponse = await this.ai.models.generateContent({ model: 'gemini-2.5-flash', contents: clausePrompt, config: { responseMimeType: 'application/json', responseSchema: analysisSchema }});
+                const clauseResponse = await this.getAi().models.generateContent({ model: 'gemini-2.5-flash', contents: clausePrompt, config: { responseMimeType: 'application/json', responseSchema: analysisSchema }});
                 const clausesData = this._parseJsonResponse<any[]>(clauseResponse, `The AI failed to analyze a section of the document (chunk ${i+1}).`);
                 
                 if (Array.isArray(clausesData)) {
