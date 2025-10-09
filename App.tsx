@@ -317,6 +317,7 @@ const App: React.FC = () => {
   const [state, dispatch] = React.useReducer(appReducer, initialState);
   const mainContentRef = React.useRef<HTMLDivElement>(null);
   const historyScrollPos = React.useRef(0);
+  const prevIsAiTyping = React.useRef(state.isAiTyping);
 
   useLayoutEffect(() => {
     const mainEl = mainContentRef.current;
@@ -330,10 +331,11 @@ const App: React.FC = () => {
     }
   }, [state.activeTool]);
 
-  const loadHistory = async () => {
+  // --- Memoized Handlers ---
+  const loadHistory = React.useCallback(async () => {
     const allAnalyses = await getAllAnalyses();
     dispatch({ type: 'SET_HISTORY', payload: allAnalyses });
-  };
+  }, []);
 
   const handleInitializeChat = React.useCallback(async () => {
     if (state.isDocumentLoaded && state.analysis) {
@@ -347,38 +349,7 @@ const App: React.FC = () => {
     }
   }, [state.isDocumentLoaded, state.analysis]);
 
-
-  React.useEffect(() => {
-    const hydrateState = async () => {
-      const persisted = await getLatestAnalysis();
-      if (persisted) {
-        dispatch({ type: 'HYDRATE_STATE', payload: persisted });
-      }
-    };
-    hydrateState();
-    loadHistory();
-  }, []);
-
-  React.useEffect(() => {
-    if (state.isDocumentLoaded && state.analysis) {
-        handleInitializeChat();
-    }
-  }, [state.isDocumentLoaded, state.analysis, handleInitializeChat]);
-
-  const handleAcceptDisclaimer = () => {
-    try {
-      localStorage.setItem('disclaimerAccepted', 'true');
-    } catch (e) {
-      console.warn("Could not save disclaimer acceptance to localStorage:", e);
-    }
-    const pending = state.analysisPending;
-    dispatch({ type: 'ACCEPT_DISCLAIMER' });
-    if (pending && pending.text.trim()) {
-      handleAnalyzeContract(pending.text, pending.options);
-    }
-  };
-
-  const handleAnalyzeContract = async (text: string, options: AnalysisOptions) => {
+  const handleAnalyzeContract = React.useCallback(async (text: string, options: AnalysisOptions) => {
     let disclaimerAccepted = false;
     try {
       disclaimerAccepted = localStorage.getItem('disclaimerAccepted') === 'true';
@@ -422,9 +393,22 @@ const App: React.FC = () => {
     } finally {
         dispatch({ type: 'ANALYSIS_PROGRESS', payload: null });
     }
-  };
+  }, [loadHistory]);
 
-  const _streamAiResponse = async (message: string, aiMessageId: string) => {
+  const handleAcceptDisclaimer = React.useCallback(() => {
+    try {
+      localStorage.setItem('disclaimerAccepted', 'true');
+    } catch (e) {
+      console.warn("Could not save disclaimer acceptance to localStorage:", e);
+    }
+    const pending = state.analysisPending;
+    dispatch({ type: 'ACCEPT_DISCLAIMER' });
+    if (pending && pending.text.trim()) {
+      handleAnalyzeContract(pending.text, pending.options);
+    }
+  }, [state.analysisPending, handleAnalyzeContract]);
+
+  const _streamAiResponse = React.useCallback(async (message: string, aiMessageId: string) => {
       try {
         let fullResponse = '';
         for await (const chunk of geminiService.sendChatMessageStream(message)) {
@@ -442,47 +426,26 @@ const App: React.FC = () => {
       } finally {
         dispatch({ type: 'FINISH_CHAT_STREAM' });
       }
-  };
+  }, []);
 
-  const handleSendMessage = async (message: string) => {
+  const handleSendMessage = React.useCallback(async (message: string) => {
     const userMessage: ChatMessage = { id: Date.now().toString(), sender: 'user', text: message };
     const aiMessageId = (Date.now() + 1).toString();
     const aiTypingMessage: ChatMessage = { id: aiMessageId, sender: 'ai', text: '' };
 
     dispatch({ type: 'SEND_CHAT_MESSAGE', payload: { userMessage, aiMessage: aiTypingMessage } });
     await _streamAiResponse(message, aiMessageId);
-  };
+  }, [_streamAiResponse]);
 
-  const handleRetryMessage = async (originalMessage: string) => {
+  const handleRetryMessage = React.useCallback(async (originalMessage: string) => {
     const aiMessageId = (Date.now() + 1).toString();
     const aiTypingMessage: ChatMessage = { id: aiMessageId, sender: 'ai', text: '' };
 
     dispatch({ type: 'RETRY_CHAT_MESSAGE', payload: { aiMessage: aiTypingMessage } });
     await _streamAiResponse(originalMessage, aiMessageId);
-  };
-  
-  React.useEffect(() => {
-    if (!state.currentAnalysisId || state.isAiTyping || state.chatHistory.length === 0) {
-        return;
-    }
-    
-    const lastMessage = state.chatHistory[state.chatHistory.length - 1];
-    if (lastMessage.sender === 'ai' && lastMessage.text === '' && !lastMessage.error) {
-        return;
-    }
+  }, [_streamAiResponse]);
 
-    const persistHistory = async () => {
-        const success = await updateChatHistory(state.currentAnalysisId!, state.chatHistory);
-        if (!success) {
-            console.warn(`Analysis ID ${state.currentAnalysisId} could not be updated. It may have been deleted.`);
-            dispatch({ type: 'ANALYSIS_DELETED_EXTERNALLY' });
-        }
-    };
-    persistHistory();
-    
-  }, [state.chatHistory, state.isAiTyping, state.currentAnalysisId]);
-
-  const handleDeleteAnalysis = async (id: number) => {
+  const handleDeleteAnalysis = React.useCallback(async (id: number) => {
     if (state.deletingId !== null) return;
 
     dispatch({ type: 'DELETE_ANALYSIS_START', payload: id });
@@ -500,28 +463,28 @@ const App: React.FC = () => {
         return;
     }
     dispatch({ type: 'DELETE_ANALYSIS_FINISH', payload: {} });
-  };
+  }, [state.deletingId, state.currentAnalysisId, loadHistory]);
 
-  const handleClearAllHistory = async () => {
+  const handleClearAllHistory = React.useCallback(async () => {
     await clearAnalysisHistory();
     dispatch({ type: 'HISTORY_CLEARED' });
-  };
+  }, []);
 
-  const handleClauseCitationClick = (clauseId: string) => {
+  const handleClauseCitationClick = React.useCallback((clauseId: string) => {
     if (!state.analysis) return;
     const clauseToCite = state.analysis.clauses.find(c => c.id === clauseId);
     if (clauseToCite) {
       dispatch({ type: 'SET_CITED_CLAUSE', payload: { text: clauseToCite.originalClause, occurrence: clauseToCite.occurrenceIndex } });
     }
-  };
+  }, [state.analysis]);
 
-  const handleAskAboutClause = (clauseText: string) => {
+  const handleAskAboutClause = React.useCallback((clauseText: string) => {
     const snippet = clauseText.length > 150 ? clauseText.substring(0, 150) + '...' : clauseText;
     const prompt = `Can you explain this clause in more detail: "${snippet}"?`;
     dispatch({ type: 'PREPOPULATE_CHAT_MESSAGE', payload: prompt });
-  };
+  }, []);
 
-  const handleRephrase = async (newPersona: AnalysisPersona) => {
+  const handleRephrase = React.useCallback(async (newPersona: AnalysisPersona) => {
     if (!state.analysis || !state.analysisOptions || !state.currentAnalysisId) return;
 
     dispatch({ type: 'REPHRASE_START' });
@@ -557,27 +520,75 @@ const App: React.FC = () => {
         const message = e instanceof Error ? e.message : 'An unknown error occurred while re-analyzing.';
         dispatch({ type: 'REPHRASE_FAILURE', payload: message });
     }
-  };
+  }, [state.analysis, state.analysisOptions, state.currentAnalysisId, loadHistory]);
+
+  // HARDENING: Memoize dispatch-based props to prevent unnecessary child re-renders.
+  const handleSetTool = React.useCallback((tool: Tool) => dispatch({ type: 'SET_TOOL', payload: tool }), []);
+  const handleCloseDisclaimer = React.useCallback(() => dispatch({ type: 'CLOSE_DISCLAIMER' }), []);
+  const handleSetContractText = React.useCallback((text: string) => dispatch({ type: 'SET_CONTRACT_TEXT', payload: text }), []);
+  const handleSetError = React.useCallback((message: string) => dispatch({ type: 'ANALYSIS_FAILURE', payload: message }), []);
+  const handleClearError = React.useCallback(() => dispatch({ type: 'CLEAR_ERROR' }), []);
+  const handleStartNew = React.useCallback(() => dispatch({ type: 'START_NEW' }), []);
+  const handleClearPrepopulatedMessage = React.useCallback(() => dispatch({ type: 'CLEAR_PREPOPULATED_CHAT_MESSAGE' }), []);
+  const handleLoadAnalysis = React.useCallback((item: PersistedAnalysis) => dispatch({ type: 'LOAD_ANALYSIS', payload: item }), []);
+
+
+  // --- Effects ---
+  React.useEffect(() => {
+    const hydrateState = async () => {
+      const persisted = await getLatestAnalysis();
+      if (persisted) {
+        dispatch({ type: 'HYDRATE_STATE', payload: persisted });
+      }
+    };
+    hydrateState();
+    loadHistory();
+  }, [loadHistory]);
+
+  React.useEffect(() => {
+    if (state.isDocumentLoaded && state.analysis) {
+        handleInitializeChat();
+    }
+  }, [state.isDocumentLoaded, state.analysis, handleInitializeChat]);
+  
+  React.useEffect(() => {
+    // HARDENING: Only persist history when the AI has just finished typing.
+    // This is a major performance optimization that prevents excessive DB writes
+    // for every single token received during the streaming response.
+    if (prevIsAiTyping.current && !state.isAiTyping && state.currentAnalysisId && state.chatHistory.length > 0) {
+        const persistHistory = async () => {
+            const success = await updateChatHistory(state.currentAnalysisId!, state.chatHistory);
+            if (!success) {
+                console.warn(`Analysis ID ${state.currentAnalysisId} could not be updated. It may have been deleted.`);
+                dispatch({ type: 'ANALYSIS_DELETED_EXTERNALLY' });
+            }
+        };
+        persistHistory();
+    }
+    // Update the ref for the next render to track the previous state.
+    prevIsAiTyping.current = state.isAiTyping;
+  }, [state.isAiTyping, state.currentAnalysisId, state.chatHistory]);
+
 
   const renderTool = () => {
     switch (state.activeTool) {
       case 'home':
-        return <HomeView onStartAnalysis={() => dispatch({ type: 'SET_TOOL', payload: 'analyze' })} />;
+        return <HomeView onStartAnalysis={() => handleSetTool('analyze')} />;
       case 'analyze':
         return <AnalyzeView
           onAnalyze={handleAnalyzeContract}
           analysis={state.analysis}
           contractText={state.contractText}
-          setContractText={(text) => dispatch({ type: 'SET_CONTRACT_TEXT', payload: text })}
+          setContractText={handleSetContractText}
           isLoading={state.isLoading}
           isRephrasing={state.isRephrasing}
           error={state.error}
-          onStartNew={() => dispatch({ type: 'START_NEW' })}
+          onStartNew={handleStartNew}
           progress={state.progress}
           analysisOptions={state.analysisOptions}
           citedClause={state.citedClause}
-          onSetError={(message) => dispatch({ type: 'ANALYSIS_FAILURE', payload: message })}
-          onClearError={() => dispatch({ type: 'CLEAR_ERROR' })}
+          onSetError={handleSetError}
+          onClearError={handleClearError}
           onAskAboutClause={handleAskAboutClause}
           onRephrase={handleRephrase}
         />;
@@ -592,8 +603,8 @@ const App: React.FC = () => {
             isChatReady={state.isChatReady}
             onRetryInit={handleInitializeChat}
             prepopulatedMessage={state.prepopulatedChatMessage}
-            onClearPrepopulatedMessage={() => dispatch({ type: 'CLEAR_PREPOPULATED_CHAT_MESSAGE' })}
-          /> : <HomeView onStartAnalysis={() => dispatch({ type: 'SET_TOOL', payload: 'analyze' })} />;
+            onClearPrepopulatedMessage={handleClearPrepopulatedMessage}
+          /> : <HomeView onStartAnalysis={() => handleSetTool('analyze')} />;
       case 'compare':
         return <CompareView initialDocument={state.contractText} />
       case 'draft':
@@ -601,13 +612,13 @@ const App: React.FC = () => {
       case 'history':
         return <HistoryView
           history={state.history}
-          onLoad={(item) => dispatch({ type: 'LOAD_ANALYSIS', payload: item })}
+          onLoad={handleLoadAnalysis}
           onDelete={handleDeleteAnalysis}
           onClearAll={handleClearAllHistory}
           deletingId={state.deletingId}
         />
       default:
-        return <HomeView onStartAnalysis={() => dispatch({ type: 'SET_TOOL', payload: 'analyze' })} />;
+        return <HomeView onStartAnalysis={() => handleSetTool('analyze')} />;
     }
   }
 
@@ -616,11 +627,11 @@ const App: React.FC = () => {
       <DisclaimerModal
         isOpen={state.showDisclaimer}
         onAccept={handleAcceptDisclaimer}
-        onClose={() => dispatch({ type: 'CLOSE_DISCLAIMER' })}
+        onClose={handleCloseDisclaimer}
       />
       <Sidebar
         activeTool={state.activeTool}
-        setActiveTool={(tool) => dispatch({ type: 'SET_TOOL', payload: tool })}
+        setActiveTool={handleSetTool}
         isDocumentLoaded={state.isDocumentLoaded}
       />
       <div className="flex flex-col flex-1 overflow-hidden">

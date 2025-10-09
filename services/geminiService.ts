@@ -322,6 +322,7 @@ Answer the user's questions about this document in a clear, concise, and helpful
     };
     const personaDescription = personaMap[options.persona] || personaMap['layperson'];
     const focus = options.focus ? `The user is particularly interested in clauses related to: ${sanitizeInput(options.focus)}.` : '';
+    const failedChunks: string[] = [];
 
     try {
         const headerPrompt = `Analyze the beginning of the following document to determine its overall nature.
@@ -362,11 +363,21 @@ CHUNK END.`;
                     }
                 }
             } catch (chunkError) {
+                // HARDENING: Instead of silently continuing, track which chunks failed.
                 console.error(`Skipping problematic chunk ${i+1} due to error:`, chunkError);
-                // Continue to the next chunk instead of terminating the entire stream
+                failedChunks.push(`section ${i + 1}`);
                 continue;
             }
         }
+        
+        // HARDENING: After the loop, check if any chunks failed. If so, throw a
+        // comprehensive error to prevent silent partial analysis failures. This ensures
+        // the user is explicitly notified of incomplete results.
+        if (failedChunks.length > 0) {
+            const message = `Analysis may be incomplete. The AI failed to process ${failedChunks.length} section(s) of the document (${failedChunks.join(', ')}). This can happen with unusual formatting or content.`;
+            throw new Error(message);
+        }
+
     } catch(e) {
         throw this._handleApiError(e, "An unknown error occurred during analysis.");
     }

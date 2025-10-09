@@ -47,7 +47,10 @@ const ParsedMessage: React.FC<{ text: string; onClauseClick: (clauseId: string) 
                 const match = part.match(/\[Citation: ([a-zA-Z0-9-]+?)\]/);
                 if (match) {
                     const clauseId = match[1];
-                    const userFriendlyText = `Clause ${clauseId.split('-')[1]}`;
+                    // FIX: Improved user-friendliness of citation text.
+                    // Instead of a potentially confusing chunk index like "Clause 0", this now
+                    // displays the full, more specific identifier like "Clause 0-5".
+                    const userFriendlyText = `Clause ${clauseId.replace('clause-', '')}`;
                     return (
                         <button
                             key={index}

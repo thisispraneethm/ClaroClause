@@ -8,7 +8,7 @@ import { GitCompareArrowsIcon } from '../icons/GitCompareArrowsIcon';
 import { UploadIcon } from '../icons/UploadIcon';
 import { XIcon } from '../icons/XIcon';
 import { DocumentTextIcon } from '../icons/DocumentTextIcon';
-import { MAX_TEXT_LENGTH } from '../../constants';
+import { MAX_COMPARE_TEXT_LENGTH, MAX_TEXT_LENGTH } from '../../constants';
 
 interface DocumentInputProps {
     title: string;
@@ -120,6 +120,17 @@ export const CompareView: React.FC<CompareViewProps> = ({ initialDocument }) => 
             setError('Please provide text for both documents to compare.');
             return;
         }
+
+        // BUG FIX & HARDENING: Add proactive, client-side validation for combined document
+        // length. This prevents the API call from being made if it's guaranteed to fail,
+        // providing immediate and clearer feedback to the user.
+        if (docA.length + docB.length > MAX_COMPARE_TEXT_LENGTH) {
+            const combinedKb = ((docA.length + docB.length) / 1000).toFixed(0);
+            const maxKb = MAX_COMPARE_TEXT_LENGTH / 1000;
+            setError(`The combined size of the documents is too large (${combinedKb}KB). The maximum is ${maxKb}KB. Please shorten them and try again.`);
+            return;
+        }
+
         setError(null);
         setIsLoading(true);
         setResult(null);
