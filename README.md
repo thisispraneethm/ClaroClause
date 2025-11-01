@@ -31,41 +31,35 @@ This application is designed as a high-quality proof-of-concept demonstrating th
 
 ## 🏁 Getting Started
 
-To run this project locally, follow these steps.
+This application is designed to be deployed to a hosting environment that can securely provide the necessary Google Gemini API key.
 
 ### Prerequisites
 
-You need a modern web browser and a way to serve the files locally. A simple web server can be started with Python or Node.js.
+- A Google Gemini API key. You can get one from [Google AI Studio](https://aistudio.google.com/app/apikey).
+- A hosting platform capable of injecting environment variables into the static site's execution context.
 
--   **Node.js (for `npx serve`)**: Make sure you have Node.js installed. You can download it from [nodejs.org](https://nodejs.org/).
+### Environment Configuration
 
-### Installation & Setup
+The application requires the `API_KEY` to be available as `process.env.API_KEY` in the browser's JavaScript context. This is a hard requirement and must be configured by the hosting environment.
+
+**This application will not function correctly if served as simple static files from a local server without a mechanism to provide the API key.** The local setup instructions below are for previewing the UI only; the AI features will not work.
+
+### Local UI Preview (without AI functionality)
+
+If you wish to preview the static UI components locally, you can use a simple web server.
 
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/your-username/claroclause.git
     cd claroclause
     ```
-
-2.  **Create an environment file:**
-
-    Create a file named `.env` in the root of the project and add your Google Gemini API key.
-
-    ```ini
-    # .env
-    API_KEY=YOUR_GEMINI_API_KEY_HERE
-    ```
-    *You can get an API key from [Google AI Studio](https://aistudio.google.com/app/apikey).*
-
-3.  **Run a local web server:**
-
-    Since this project uses ES modules directly in the browser, you just need a simple static server. You can use the `serve` package for this.
-
+2.  **Run a local server:**
+    Ensure you have Node.js installed, then run:
     ```bash
-    # Run this command from the project root directory
+    # From the project root directory
     npx serve
     ```
-    This will start a server, typically at `http://localhost:3000`. Open this URL in your browser to use the application.
+    This will start a server (e.g., at `http://localhost:3000`). Opening this URL will show the application UI, but any action requiring the Gemini API will fail due to the missing API key.
 
 ---
 

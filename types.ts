@@ -5,7 +5,9 @@ export enum RiskLevel {
   Unknown = 'Unknown'
 }
 
-// FIX: Added a constant for confidence levels to be the single source of truth.
+// Using a `const` assertion (`as const`) creates a readonly tuple type. This provides
+// stronger type-safety than a simple string array, enabling autocompletion and
+// preventing accidental assignment of invalid confidence levels.
 export const CONFIDENCE_LEVELS = ['High', 'Medium', 'Low'] as const;
 type ConfidenceTuple = typeof CONFIDENCE_LEVELS;
 export type ConfidenceLevel = ConfidenceTuple[number];

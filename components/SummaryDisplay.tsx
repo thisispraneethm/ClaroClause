@@ -9,6 +9,7 @@ import { CopyIcon } from './icons/CopyIcon';
 import { ShieldAlertIcon } from './icons/ShieldAlertIcon';
 import { HelpCircleIcon } from './icons/HelpCircleIcon';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { XIcon } from './icons/XIcon';
 
 const riskStyles: { [key in RiskLevel]: { textColorClass: string; bgColorClass: string; icon: React.FC<React.SVGProps<SVGSVGElement>>; shadowClass: string; } } = {
   [RiskLevel.High]: { textColorClass: 'text-risk-high', bgColorClass: 'bg-risk-high', icon: ShieldAlertIcon, shadowClass: 'hover:shadow-risk-high-glow' },
@@ -107,12 +108,16 @@ const ClauseCard: React.FC<{ clause: DecodedClause; onHover: (clauseText: string
               <div className="bg-background/50 p-4 border-t border-border/50">
                   <div className="flex justify-between items-center mb-2">
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Source Text</h4>
-                      <button 
-                          onClick={handleCopy}
-                          className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md text-muted-foreground bg-secondary hover:text-foreground transition-all duration-200"
+                      <button
+                        onClick={handleCopy}
+                        className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded-md text-muted-foreground bg-secondary hover:text-foreground transition-all duration-200 ${copyStatus === 'Failed!' ? '!text-risk-high' : ''}`}
                       >
-                          {copyStatus === 'Copied!' ? <CheckCircleIcon className="w-3.5 h-3.5 text-risk-low" /> : <CopyIcon className="w-3.5 h-3.5" />}
-                          <span>{copyStatus}</span>
+                        {
+                            copyStatus === 'Copied!' ? <CheckCircleIcon className="w-3.5 h-3.5 text-risk-low" /> :
+                            copyStatus === 'Failed!' ? <XIcon className="w-3.5 h-3.5" /> :
+                            <CopyIcon className="w-3.5 h-3.5" />
+                        }
+                        <span>{copyStatus}</span>
                       </button>
                   </div>
                 <p className="text-sm text-muted-foreground/80 font-mono whitespace-pre-wrap break-words">{clause.originalClause}</p>

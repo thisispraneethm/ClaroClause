@@ -19,9 +19,10 @@ export const DraftView: React.FC = () => {
 
   React.useEffect(() => {
     isMounted.current = true;
+    // On component unmount, cancel any ongoing AI operations to prevent memory leaks
+    // and race conditions. Also clear any pending timeouts.
     return () => {
       isMounted.current = false;
-      // FIX: Use the unified cancellation method to ensure any active draft stream is stopped.
       geminiService.cancelOngoingOperations();
       if (copyTimeoutRef.current) {
         clearTimeout(copyTimeoutRef.current);

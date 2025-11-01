@@ -6,7 +6,6 @@ import { SparklesIcon } from '../icons/SparklesIcon';
 import { MessageCircleIcon } from '../icons/MessageCircleIcon';
 import { GitCompareArrowsIcon } from '../icons/GitCompareArrowsIcon';
 import { PencilIcon } from '../icons/PencilIcon';
-// FIX: Imported the missing HistoryIcon component to resolve the "Cannot find name 'HistoryIcon'" error.
 import { HistoryIcon } from '../icons/HistoryIcon';
 
 interface HomeViewProps {
