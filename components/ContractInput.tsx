@@ -20,7 +20,8 @@ export const ContractInput: React.FC<ContractInputProps> = ({ value, onChange, o
   const [isReadingFile, setIsReadingFile] = React.useState(false);
 
   // UX FIX: Auto-resize textarea height based on content.
-  React.useEffect(() => {
+  // Using useLayoutEffect instead of useEffect to prevent visual jitter (FOUC).
+  React.useLayoutEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
         textarea.style.height = 'auto'; // Reset height

@@ -112,6 +112,8 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
       analysisOptions || { persona: 'layperson', focus: '' }
   );
 
+  // UX DECISION: We only scroll to a clause if it's explicitly cited (clicked), 
+  // not just hovered. However, we highlight both.
   const highlightTarget = citedClause || debouncedHoveredClause;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -155,8 +157,10 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
     }
   }, [analysis, isLoading]);
 
+  // UX HARDENING: Only scroll when citedClause changes. Do NOT scroll on hover.
+  // This prevents the document from "jumping" while the user is exploring the sidebar.
   useLayoutEffect(() => {
-    if (highlightTarget.text && documentContainerRef.current) {
+    if (citedClause && citedClause.text && documentContainerRef.current) {
         const container = documentContainerRef.current;
         const markElement = container.querySelector('mark');
         if (markElement) {
@@ -164,19 +168,30 @@ export const AnalyzeView: React.FC<AnalyzeViewProps> = ({ onAnalyze, analysis, c
                 behavior: 'smooth',
                 block: 'center',
             });
-            const containerRect = container.getBoundingClientRect();
-            const markRect = markElement.getBoundingClientRect();
-            setAskButtonPosition({
-                top: markRect.top - containerRect.top + container.scrollTop,
-                right: container.clientWidth - (markRect.right - containerRect.left) + 8,
-            });
-        } else {
-            setAskButtonPosition(null);
         }
-    } else {
-        setAskButtonPosition(null);
     }
+  }, [citedClause]);
+
+  // Handle positioning of the "Ask" button based on the currently highlighted element
+  useLayoutEffect(() => {
+      if (highlightTarget.text && documentContainerRef.current) {
+          const container = documentContainerRef.current;
+          const markElement = container.querySelector('mark');
+          if (markElement) {
+               const containerRect = container.getBoundingClientRect();
+               const markRect = markElement.getBoundingClientRect();
+               setAskButtonPosition({
+                  top: markRect.top - containerRect.top + container.scrollTop,
+                  right: container.clientWidth - (markRect.right - containerRect.left) + 8,
+               });
+          } else {
+              setAskButtonPosition(null);
+          }
+      } else {
+          setAskButtonPosition(null);
+      }
   }, [highlightTarget]);
+
 
   if (analysis) {
     return (

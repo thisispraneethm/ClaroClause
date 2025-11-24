@@ -24,7 +24,7 @@ const DocumentInput: React.FC<DocumentInputProps> = ({ title, value, onChange, o
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
     const [isReadingFile, setIsReadingFile] = React.useState(false);
 
-    React.useEffect(() => {
+    React.useLayoutEffect(() => {
         const textarea = textareaRef.current;
         if (textarea) {
             textarea.style.height = 'auto';

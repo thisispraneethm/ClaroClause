@@ -3,6 +3,14 @@ import { MAX_COMPARE_TEXT_LENGTH } from '../constants';
 import type { AnalysisOptions, AnalysisStreamEvent, ContractAnalysis, DecodedClause, ComparisonResult, RephrasedClause, HeaderAnalysis } from '../types';
 import { RiskLevel, CONFIDENCE_LEVELS } from '../types';
 
+const PERSONA_PROMPTS: Record<string, string> = {
+    'layperson': 'a layperson with no legal background',
+    'business_owner': 'a small business owner concerned with risk and liability',
+    'lawyer': 'a lawyer looking for potential issues and ambiguities',
+    'first_home_buyer': 'a first-time home buyer who is unfamiliar with real estate documents',
+    'explain_like_im_five': 'a five-year-old child'
+};
+
 /**
  * A targeted sanitization function to mitigate prompt injection.
  * This function is designed to be less destructive than a generic sanitizer. It removes
@@ -190,7 +198,7 @@ class GeminiService {
    * providing clearer, more specific error messages to the user.
    */
   private _parseJsonResponse<T>(response: GenerateContentResponse, errorMessage: string): T {
-    const text = response.text?.trim();
+    let text = response.text?.trim();
     if (!text) {
         const finishReason = response.candidates?.[0]?.finishReason;
         if (finishReason === 'SAFETY') {
@@ -201,10 +209,30 @@ class GeminiService {
         }
         throw new Error("The AI returned an empty response. It may have been unable to process the request.");
     }
+
+    // HARDENING: Aggressively clean markdown blocks if simple extraction fails.
     try {
-        const jsonMatch = text.match(/```(json)?\s*([\sS]*?)\s*```/);
-        const jsonString = jsonMatch ? jsonMatch[2] : text;
-        return JSON.parse(jsonString);
+        // First try: Extract content between ```json ... ``` or just ``` ... ```
+        const jsonMatch = text.match(/```(?:json)?\s*([\sS]*?)\s*```/);
+        if (jsonMatch) {
+            text = jsonMatch[1];
+        } else {
+             // Fallback: If no code blocks, assumes the whole text might be JSON, but remove any leading non-bracket chars if possible
+             // This is risky but handles cases where the model chats before the JSON.
+             const firstBrace = text.indexOf('{');
+             const firstBracket = text.indexOf('[');
+             const start = (firstBrace > -1 && firstBracket > -1) ? Math.min(firstBrace, firstBracket) : (firstBrace > -1 ? firstBrace : firstBracket);
+             
+             if (start > -1) {
+                 const lastBrace = text.lastIndexOf('}');
+                 const lastBracket = text.lastIndexOf(']');
+                 const end = Math.max(lastBrace, lastBracket);
+                 if (end > start) {
+                     text = text.substring(start, end + 1);
+                 }
+             }
+        }
+        return JSON.parse(text);
     } catch (e) {
         console.error("Failed to parse JSON:", text);
         throw new Error(errorMessage);
@@ -230,6 +258,10 @@ class GeminiService {
   }
 
   public async initializeChat(analysis: ContractAnalysis): Promise<void> {
+    if (!analysis.clauses) {
+        throw new Error("Cannot initialize chat: Analysis is missing clause data.");
+    }
+    
     const contextSummary = (analysis.keyTakeaways && analysis.keyTakeaways.length > 0)
         ? analysis.keyTakeaways.map(t => `- ${t}`).join('\n')
         : `The document contains ${analysis.clauses.length} clauses.`;
@@ -313,14 +345,7 @@ Answer the user's questions about this document in a clear, concise, and helpful
     const chunks = sanitizedText.match(new RegExp(`.{1,${chunkSize}}`, 'gs')) || [];
     if (chunks.length === 0) throw new Error("The document is empty.");
     
-    const personaMap = {
-        'layperson': 'a layperson with no legal background',
-        'business_owner': 'a small business owner concerned with risk and liability',
-        'lawyer': 'a lawyer looking for potential issues and ambiguities',
-        'first_home_buyer': 'a first-time home buyer who is unfamiliar with real estate documents',
-        'explain_like_im_five': 'a five-year-old child'
-    };
-    const personaDescription = personaMap[options.persona] || personaMap['layperson'];
+    const personaDescription = PERSONA_PROMPTS[options.persona] || PERSONA_PROMPTS['layperson'];
     const focus = options.focus ? `The user is particularly interested in clauses related to: ${sanitizeInput(options.focus)}.` : '';
     const failedChunks: string[] = [];
 
@@ -412,14 +437,7 @@ DOCUMENT B END.
   }
   
   public async rephraseAnalysis(clauses: DecodedClause[], options: AnalysisOptions): Promise<RephrasedClause[]> {
-    const personaMap = {
-        'layperson': 'a layperson with no legal background',
-        'business_owner': 'a small business owner concerned with risk and liability',
-        'lawyer': 'a lawyer looking for potential issues and ambiguities',
-        'first_home_buyer': 'a first-time home buyer who is unfamiliar with real estate documents',
-        'explain_like_im_five': 'a five-year-old child'
-    };
-    const personaDescription = personaMap[options.persona] || personaMap['layperson'];
+    const personaDescription = PERSONA_PROMPTS[options.persona] || PERSONA_PROMPTS['layperson'];
     const focus = options.focus ? `The user is particularly interested in clauses related to: ${sanitizeInput(options.focus)}.` : '';
 
     const clausesToRephrase = clauses.map(c => ({ id: c.id, originalClause: c.originalClause, title: c.title }));
